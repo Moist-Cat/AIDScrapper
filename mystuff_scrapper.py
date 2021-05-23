@@ -1,11 +1,14 @@
 import json
 import requests
+import getpass
 
 class AIDStuffGetter(object):
     """
     Based on ScripAnon stuff getter script.
     """
-    def __init__(self, key=None):
+    def __init__(self):
+        self.url = 'https://api.aidungeon.io/graphql'
+
         self.stories_query = {
             "variables": {
                 "input": {
@@ -124,25 +127,19 @@ class AIDStuffGetter(object):
         }
         """ + self.ccs).replace('\t', '')
         }
-        if key:
-            self.key = key
-        else:
-            with open('token.txt', 'r') as file:
-                self.key=file.read()
-            if not self.key:
-                self.key = input('Please enter your token: ')
-                with open('token.txt', 'w') as file:
-                	file.write(self.key)
+
+        # requests settings
+        self.session = requests.Session()
+        
+        key = self.get_login_token()
+
+        self.session.headers.update({'content-type': 'application/json',
+                                    'x-access-token': key})
+
         self.out = {"stories": [], "scenarios": []}
         self.subscen = []
 
         self.discarded_stories = 0
-
-        # requests settings
-        self.session = requests.Session()
-        self.session.headers.update({'content-type': 'application/json',
-                                    'x-access-token': self.key})
-        self.url = 'https://api.aidungeon.io/graphql'
 
     def get_stories(self, name="", min_act=0):
         """
@@ -158,7 +155,7 @@ class AIDStuffGetter(object):
 
             try:
                 res = self.session.post(self.url, data=json.dumps(self.stories_query)).json()
-            except requests.HTTPError as e:
+            except requests.exceptions.ConnectionError or requests.HTTPError as e:
                 print(e)
                 print(e.read())
             result = res['data']['user']['search']
@@ -191,7 +188,7 @@ class AIDStuffGetter(object):
 
             try:
                 res = self.session.post(self.url, data=json.dumps(self.scenarios_query)).json()
-            except requests.HTTPError as e:
+            except requests.exceptions.ConnectionError or requests.HTTPError as e:
                 print(e)
                 print(e.read())
             result = res['data']['user']['search']
@@ -222,7 +219,7 @@ class AIDStuffGetter(object):
 
         try:
             res = self.session.post(self.url, data=json.dumps(self.subscen_query)).json()
-        except requests.HTTPError as e:
+        except requests.exceptions.ConnectionError or requests.HTTPError as e:
             print(e)
             print(e.read())
         if 'data' in res and 'scenario' in res['data']:
@@ -234,8 +231,41 @@ class AIDStuffGetter(object):
         else:
             print('There was no data...')
             print(res)
+
+    def get_login_token(self):
+        while True:
+            loginpayload = {
+                "variables": {
+                    "identifier": "",
+                    "email": "",
+                    "password": ""
+                },
+                "query": """
+            mutation ($identifier: String, $email: String, $password: String, $anonymousId: String) {
+                login(identifier: $identifier, email: $email, password: $password, anonymousId: $anonymousId) {
+                    accessToken
+                }
+            }
+            """
+            }
+
+            loginpayload['variables']['identifier'] = loginpayload['variables']['email'] = input('Your username or e-mail: ')
+            loginpayload['variables']['password'] = getpass.getpass('Your password: ')
+            try:
+                payload = self.session.post(self.url, data=json.dumps(loginpayload)).json()
+                if 'errors' in payload:
+                    print('Couldn\'t log in.')
+                    for error in payload['errors']:
+                        print(error['message'])
+                        return ''
+                elif 'data' in payload:
+                    return payload['data']['login']['accessToken']
+                else:
+                    print('no data?!')
+            except requests.exceptions.ConnectionError or requests.HTTPError as e:
+                print(e)
 if __name__ == '__main__':
-    a = AIDStuffGetter(os.environ['TOKEN'])
+    a = AIDStuffGetter()
     a.get_scenarios()
     with open('stories.json', 'w') as outfile:
         json.dump(a.out, outfile)
