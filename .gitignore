@@ -9,3 +9,5 @@ index.html
 test_files/
 tests.py
 token
+*.scenario
+setup.py
