@@ -130,11 +130,28 @@ class AIDStuffGetter(object):
 
         # requests settings
         self.session = requests.Session()
-        
-        key = self.get_login_token()
+        self.session.headers.update({
+            'User-Agent':'Mozilla/5.0 (X11; Fedora; Linux x86_64) ' \
+                         'AppleWebKit/537.36 (KHTML, like Gecko) ' \
+                         'Chrome/90.0.4430.93 Safari/537.36',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Connection': 'keep-alive',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Host': 'api.aidungeon.io',
+            'Origin':'https://play.aidungeon.io',
+            'Referer':'https://play.aidungeon.io/',
+            'content-type': 'application/json',
+        })
 
-        self.session.headers.update({'content-type': 'application/json',
-                                    'x-access-token': key})
+
+        try:
+            with open('token.txt') as file:
+                key = file.read()
+        
+        except:
+            key = self.get_login_token()
+        
+        self.session.headers.update({'x-access-token': key})
 
         self.out = {"stories": [], "scenarios": []}
         self.subscen = []
@@ -155,6 +172,7 @@ class AIDStuffGetter(object):
 
             try:
                 res = self.session.post(self.url, data=json.dumps(self.stories_query)).json()
+                print(res)
             except requests.exceptions.ConnectionError or requests.HTTPError as e:
                 print(e)
                 print(e.read())
@@ -264,6 +282,167 @@ class AIDStuffGetter(object):
                     print('no data?!')
             except requests.exceptions.ConnectionError or requests.HTTPError as e:
                 print(e)
+
+    def upload_in_bulk(self, stories):
+        for scenario in stories['scenarios']:
+            create_scen_payload = {
+                          "variables":{},
+                          "query":"""
+                          mutation {
+                                  createScenario {
+                                    ...ScenarioEditScenario
+                                    __typename
+                                  }
+                                }
+
+                                fragment ScenarioEditScenario on Scenario {
+                                  id
+                                  publicId
+                                  allowComments
+                                  createdAt
+                                  deletedAt
+                                  description
+                                  memory
+                                  authorsNote
+                                  mode
+                                  musicTheme
+                                  nsfw
+                                  prompt
+                                  published
+                                  featured
+                                  safeMode
+                                  quests
+                                  tags
+                                  thirdPerson
+                                  title
+                                  updatedAt
+                                  options {
+                                    id
+                                    publicId
+                                    title
+                                    __typename
+                                  }
+                                  ...ContentOptionsSearchable
+                                  ...DeleteButtonSearchable
+                                  __typename
+                                }
+
+                                fragment ContentOptionsSearchable on Searchable {
+                                  id
+                                  publicId
+                                  published
+                                  isOwner
+                                  tags
+                                  title
+                                  userId
+                                  ... on Savable {
+                                    isSaved
+                                    __typename
+                                  }
+                                  ... on Adventure {
+                                    userJoined
+                                    __typename
+                                  }
+                                  __typename
+                                }
+
+                                fragment DeleteButtonSearchable on Searchable {
+                                  id
+                                  publicId
+                                  published
+                                  __typename
+                                }
+            """
+            }
+
+            res = self.session.post(self.url, data=json.dumps(create_scen_payload))
+            update_scen_payload = {
+                                  'variables': {
+                                   'input': {
+                                      "publicId": res.json()['data']['createScenario']['publicId'],
+                                      "title": scenario['title'],
+                                      "description": scenario['description'],
+                                      "prompt": scenario['prompt'],
+                                      "memory": scenario['memory'],
+                                      "authorsNote": scenario['authorsNote'],
+                                      "quests": [],
+                                      "musicTheme": None,
+                                      "tags": scenario['tags'],
+                                      "nsfw": False,
+                                      "published": False,
+                                      "featured": False,
+                                      "safeMode": True,
+                                      "thirdPerson": False,
+                                      "mode": "creative",
+                                      "allowComments": True
+                                    }},
+                                  'query': """
+                                      mutation ($input: ScenarioInput) {
+                                      updateScenario(input: $input) {
+                                        ...ScenarioEditScenario
+                                        __typename
+                                      }
+                                    }
+
+                                    fragment ScenarioEditScenario on Scenario {
+                                      id
+                                      publicId
+                                      allowComments
+                                      createdAt
+                                      deletedAt
+                                      description
+                                      memory
+                                      authorsNote
+                                      mode
+                                      musicTheme
+                                      nsfw
+                                      prompt
+                                      published
+                                      featured
+                                      safeMode
+                                      quests
+                                      tags
+                                      thirdPerson
+                                      title
+                                      updatedAt
+                                      options {
+                                        id
+                                        publicId
+                                        title
+                                        __typename
+                                      }
+                                      ...ContentOptionsSearchable
+                                      ...DeleteButtonSearchable
+                                      __typename
+                                    }
+
+                                    fragment ContentOptionsSearchable on Searchable {
+                                      id
+                                      publicId
+                                      published
+                                      isOwner
+                                      tags
+                                      title
+                                      userId
+                                      ... on Savable {
+                                        isSaved
+                                        __typename
+                                      }
+                                      ... on Adventure {
+                                        userJoined
+                                        __typename
+                                      }
+                                      __typename
+                                    }
+
+                                    fragment DeleteButtonSearchable on Searchable {
+                                      id
+                                      publicId
+                                      published
+                                      __typename
+                                    }"""}
+            res = self.session.post(self.url, data=json.dumps(update_scen_payload))
+
 if __name__ == '__main__':
     a = AIDStuffGetter()
     a.get_scenarios()

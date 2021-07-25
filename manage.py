@@ -35,26 +35,26 @@ def download(*args):
         with open('stories.json', 'w') as outfile:
             json.dump(a.out, outfile)
         try:
-            import my_stuff_json_to_html
+            import mystuff_json_to_html
         except ModuleNotFoundError:
-            print('my_stuff_json_to_html.py was not found. Make sure you named it correctly.')
+            print('mystuff_json_to_html.py was not found. Make sure you named it correctly.')
     if contentype == 'scenarios':
         a.get_scenarios(title)
         with open('stories.json', 'w') as outfile:
            json.dump(a.out, outfile)
         try:
-            import my_stuff_json_to_html
+            import mystuff_json_to_html
         except ModuleNotFoundError:
-            print('my_stuff_json_to_html.py was not found. Make sure you named it correctly.')
+            print('mystuff_json_to_html.py was not found. Make sure you named it correctly.')
     if contentype == 'all':
         a.get_stories(title, actions)
         a.get_scenarios()
         with open('stories.json', 'w') as outfile:
             json.dump(a.out, outfile)
         try:
-            import my_stuff_json_to_html
+            import mystuff_json_to_html
         except ModuleNotFoundError:
-            print('my_stuff_json_to_html.py was not found. Make sure you named it correctly.')
+            print('mystuff_json_to_html.py was not found. Make sure you named it correctly.')
 
     if contentype == 'publish':
         publish(title)
@@ -62,6 +62,16 @@ def download(*args):
     if contentype == 'makenai':
         story_to_json()
     
+    if contentype == 'fenix':
+        try:
+            with open('stories.json') as file:
+                data = json.load(file)
+                a.upload_in_bulk(data)
+        except FileNotFoundError:
+            scenarios = a.get_scenarios()
+            with open('stories.json', 'w') as outfile:
+                json.dump(a.out, outfile)
+            a.upload_in_bulk(a.out['scenarios'])
     if contentype == 'help':
         print('''
 Usage: python manage.py [publish/stories/scenarios/makenai] [title] [min_number_of_actions]
