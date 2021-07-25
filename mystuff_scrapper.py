@@ -442,6 +442,7 @@ class AIDStuffGetter(object):
                                       __typename
                                     }"""}
             res = self.session.post(self.url, data=json.dumps(update_scen_payload))
+            print(f'{scenario["title"]} successfully uploaded..')
 
 if __name__ == '__main__':
     a = AIDStuffGetter()
