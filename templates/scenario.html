@@ -1,0 +1,68 @@
+{{ extends "base.html" }}
+	<li date="{{ scenario["createdAt"] }}">
+		<a href="scenarios/{{ scenario["title"] }}.html">
+			{{ scenario["title"] }}
+		</a>
+	</li>
+	<title>{{ scenario["title"] }}</title>
+	<h1>{{ scenario["title"] }}</h1>
+		Created at: {{ scenario["createdAt"] }}<br>
+		Updated at: {{ scenario["updatedAt"] }}
+	<h2>Description</h2>
+		{{ scenario["description"] }}
+	<h2>Prompt</h2>
+		{{ scenario["prompt"] }}
+	<h2>Remember</h2>
+		{{ scenario["memory"] }}
+	<h2>Author's Note</h2>
+		{{ scenario["authorsNote"] }}
+	{% if "quests" in scenario and scenario["quests"] %}
+		<h2>Quests</h2>
+		{% for quest in scenario["quests"]["quest"] %}
+			<br>{{ quest }}
+		{% endfor %}
+	{% endif %}
+	{% if "options" in scenario %}
+		<h2>Options</h2>
+			<ul>
+				{{ for subscen in scenario["options"]  }}
+					<li date="{{ scenario["createdAt"] }}">
+						<a name="link_subscenario" href="{{ scenario["title"]/{{ subscen["title"] }}.html">
+						    {{ subscen["title"] }}
+						</a>
+					</li>
+				{% endfor %}
+		  	</ul>
+	{% endif %}
+	{% if "worldInfo" in scenario %}
+		<details><summary><h2>World Info</h2></summary>
+			{% for wi in scenario["worldInfo"] %}
+				<b>{{ wi["keys"] }}</b>: wi["entry"]</hr>
+			{% endfor %}
+		</details>
+	{% endif %}
+    <details><summary><h2>Scripts</h2></summary>
+    {% if "sharedLibrary" in scenario["gameCode"] %}
+        <h3>Shared library</h3>
+        <pre>
+            scenario["gameCode"]["sharedLibrary"]
+        </pre>
+	{% endif %}
+    {% if "onInput" in scenario["gameCode"] %}
+        <h3>Input modifier</h3>
+        <pre>
+        	scenario["gameCode"]["onInput"]
+		</pre>
+	{% endif %}
+    {% if "onModelContext" in scenario["gameCode"] %}
+        <h3>Context modifier</h3>
+    	<pre>
+    		scenario["gameCode"]["onModelContext"]
+    	</pre>
+	{% endif %}
+    {% if "onOutput" in scenario["gameCode"] %}
+        <h3>Output modifier</h3>
+        <pre>
+        	scenario["gameCode"]["onOutput"]
+		</pre>
+	{% endif %}

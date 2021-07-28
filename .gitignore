@@ -1,13 +1,20 @@
-Production
-index.html
-*.json
+# Scraped or sensitive data
+index*
 stories/
 scenarios/
-__pycache__/
-install.py
+*.json
 index.html
-test_files/
-tests.py
 token
 *.scenario
-setup.py
+
+# python cache
+__pycache__/
+
+# backups
+backups/
+!/backups/.gitkeep
+
+# test files, they need a token to test against the 
+# real server
+test_files/
+tests.py

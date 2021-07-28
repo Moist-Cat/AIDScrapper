@@ -6,6 +6,8 @@ import html
 def escape(text):
     if type(text) is str:
         return html.escape(text)
+    elif type(text) is list:
+        return html.escape(", ".join(text))
     else:
         return "(null)"
 
@@ -23,9 +25,10 @@ def new_dir(folder):
 def nlescape(text):
     return escape(text).replace('\n','<br>')
 
-infile = json.load(open('stories.json'))
-index = open('index.html', 'w', encoding='utf-8')
-if 'stories' in infile:
+def story_to_html():
+    new_dir('stories')
+    stories = json.load(open('stories.json'))
+    index = open('index_story.html', 'w', encoding='utf-8')
     index.write("""
     <!DOCTYPE html>
     <html>
@@ -39,9 +42,8 @@ if 'stories' in infile:
     <h1>AI Dungeon Archive</h1>
     <h2>Stories</h2>
     <ul>""")
-    new_dir('stories')
     story_number = {}
-    for story in infile['stories']:
+    for story in stories:
         if story['title'] and "/" in story['title']:
             story['title'] = story['title'].replace('/', '-')
         try:
@@ -107,12 +109,29 @@ if 'stories' in infile:
             print('An error occured converting story %s:' % story['title'])
             print('%s: %s' % (type(e).__name__, e))
             input("Press enter to dismiss...")
+    index.write('</ul></body></html>')
+    index.close()
+    print('Stories successfully formatted')
 
-    index.write('</ul><h2>Scenarios</h2><ul>')
-if 'scenarios' in infile:
+def scenario_to_html():
     new_dir('scenarios')
+    scenarios = json.load(open('scenario.json'))
+    index = open('index_scen.html', 'w', encoding='utf-8')
+    index.write("""
+    <!DOCTYPE html>
+    <html>
+    <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width">
+    <link rel="stylesheet" href="style.css">
+    <title>AI Dungeon Archive</title>
+    </head>
+    <body>
+    <h1>AI Dungeon Archive</h1>
+    <h2>Scenarios</h2>
+    <ul>""")
     subscen_paths = {}
-    for scenario in infile['scenarios']:
+    for scenario in scenarios:
         # get rid of annoying "/"s that mess with mkdir
         if scenario['title'] and '/' in scenario['title']:
             scenario['title'] = scenario['title'].replace('/', '-')
@@ -150,8 +169,6 @@ Updated at: %s
                     # Latitude based chads made quests as a list of dicts
                     # terefore we have to get the item inside
                     # or all quests will be {'quest': 'bar'}.
-                    # In this case it will write (null) since
-                    # escape() detects a list and not a str.
                     quest_string = quest['quest']
                     htmlfile.write(nlescape(quest_string))
                     if quest != scenario['quests'][-1]:
@@ -191,11 +208,8 @@ Updated at: %s
             htmlfile.write('</body></html>')
             htmlfile.close()
         except Exception as e:
-            fewwwef
             print('An error occured converting scenario %s:' % scenario['title'])
             print('%s: %s' % (type(e).__name__, e))
             input("Press enter to dismiss...")
-
-index.write('</ul></body></html>')
-index.close()
-print("Your dose of porn is ready for reading.")
+    index.close()
+    print('Scenarios successfully formatted')
