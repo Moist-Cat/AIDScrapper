@@ -1,11 +1,13 @@
 # Scraped or sensitive data
 index*
+scen_index.html
 stories/
 scenarios/
 *.json
 index.html
 token
 *.scenario
+
 
 # python cache
 __pycache__/

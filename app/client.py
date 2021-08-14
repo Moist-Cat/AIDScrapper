@@ -4,13 +4,14 @@ import getpass
 from typing import Any, Type, Tuple, Dict
 import time
 
-import settings
+from .models import Story, Scenario
+from . import settings
 
 class AIDScrapper:
     """
     AID Client to make API calls via requests.
     """
-    def __init__(self, title, actions):
+    def __init__(self):
         
         self.url = 'https://api.aidungeon.io/graphql'
 
@@ -22,22 +23,27 @@ class AIDScrapper:
         self.session = requests.Session()
         self.session.headers.update(settings.headers)
 
-        try:
-            with open('token.txt') as file:
-                key = file.read()
-        
-        except:
-            key = self.get_login_token()
-        
-        self.session.headers.update({'x-access-token': key})
-
-        adventures = Story(title, action)
-        prompt = Scenario(title)
+        self.adventures = Story
+        self.prompts = Scenario
 
         self.discarded_stories = 0
 
     def __delete__(self):
         self.session.close()
+
+    def get_keys(self, username, password):
+        try:
+            with open('token.txt') as file:
+                key = file.read()
+        
+        except:
+            if not username and password:
+                username = input('Your username or e-mail: ')
+                password = getpass.getpass('Your password: ')
+
+            key = self.get_login_token(username, password)
+
+        self.session.headers.update({'x-access-token': key})
 
     def get_object(query):
         query['variables']['input']['searchTerm'] = self.adventures.title
@@ -89,7 +95,7 @@ class AIDScrapper:
             if len(result):
                 for scenario in result:
                     try:
-                        self.prompt.add(scenario)
+                        self.prompts.add(scenario)
                     except ValidationError:
                         self.discarded_stories += 1
                     if type(scenario['options']) is list:
@@ -98,11 +104,11 @@ class AIDScrapper:
                             # don not count suscens
                             self.discarded_stories -= 1
                             
-                print('Got {len(self.prompt)} scenarios so far')
+                print('Got {len(self.prompts)} scenarios so far')
                 self.scenarios_query['variables'] \
                                     ['input'] \
                                     ['offset'] = len(
-                                                     self.prompt
+                                                     self.prompts
                                                  ) + self.discarded_stories
             else:
                 print('Looks like there\'s no more.')
@@ -118,7 +124,7 @@ class AIDScrapper:
         
         result['isOption'] = True
         try:
-            self.prompt.add(result)
+            self.prompts.add(result)
         except ValidationError:
             # With subscens there is no problem with offset
             pass
@@ -127,13 +133,11 @@ class AIDScrapper:
                 self.get_subscenario(option['publicId'])
                 self.discarded_stories -= 1
 
-    def get_login_token(self):
+    def get_login_token(self, user, password):
         while True:
-
             self.aid_loginpayload['variables']['identifier'] = \
-                self.aid_loginpayload['variables']['email'] = \
-                input('Your username or e-mail: ')
-            self.aid_loginpayload['variables']['password'] = getpass.getpass('Your password: ')
+                self.aid_loginpayload['variables']['email'] = user
+            self.aid_loginpayload['variables']['password'] = password
             try:
                 res = self.session.post(
                     self.url,
@@ -146,12 +150,13 @@ class AIDScrapper:
                     for error in payload['errors']:
                         print(error['message'])
                         return ''
-                elif 'data' in payload:
+                elif 'data' in res:
                     return res['data']['login']['accessToken']
                 else:
                     print('no data?!')
             except requests.exceptions.ConnectionError or requests.HTTPError as e:
-                print(e)
+                print(e, '\nRetrying...')
+                time.sleep(3)
 
     def upload_in_bulk(self, stories):
         for scenario in stories['scenarios']:
@@ -174,7 +179,7 @@ class AIDScrapper:
 class ClubClient:
 
     def __init__(self):
-        self.url = 'https://prompts.aidg.club/'
+        self.url = 'https://promptss.aidg.club/'
 
         # Get all settings
         for setting in settings.club:
@@ -271,8 +276,8 @@ class ClubClient:
                     "Command.ParentId": "",
                     "Command.Title": scenario['title'],
                     "Command.Description": scenario['description'],
-                    "Command.PromptContent": scenario['prompt'],
-                    "Command.PromptTags": tags['tags'],
+                    "Command.promptsContent": scenario['prompts'],
+                    "Command.promptsTags": tags['tags'],
                     "Command.Memory": scenario['memory'],
                     "Command.Quests": quests,
                     "Command.AuthorsNote": scenario['authorsNote'],
@@ -292,11 +297,9 @@ class ClubClient:
 
                 res = session.post(variables[1], params)
 
-                print(f'Your prompt number is {res.url.split("/")[-1]}')
+                print(f'Your prompts number is {res.url.split("/")[-1]}')
                 # I don't want to overload his servers...
                 time.sleep(1)
-
-
 if __name__ == '__main__':
     pass
 

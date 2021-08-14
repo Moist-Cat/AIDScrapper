@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+	<li title="{{ story["createdAt"] }}">
+		<a href="stories/{{ story["title"] }}{{ story_number[story["title"]] }}.html">
+		    {{ story['title'] }}{{ story_number[story["title"]] }}
+		</a>
+	</li>
+	<label id="underlineactions"
+		style="display: none"
+		title="Story is red, do is green, say is blue.">
+		<input autocomplete="off"
+		    onchange="document.body.className = this.checked ? 'showtypes' : ''"
+		    type="checkbox">
+		Underline actions
+	 </label>
+	<details>
+		<summary>
+		    Details
+		</summary>
+	<p id="id_title">
+		Description: {{ story["description"] }}
+	<br>Created at: {{ story["createdAt"] }}
+	<br>Updated at: {{ story["updatedAt"] }}
+	<br>Remember: {{ story["memory"] }}
+	<p id="id_an">Author's note: {{ story["authorsNote"] }}</p>
+	    <details>
+		{% for action in story["undoneWindow"] %}
+			<span data-type="{{ action["type"] }}" date="{{ action["createdAt"] }}">
+			    action["text"]
+			</span>
+			<hr>
+		</details>
+		{% endfor %}
+	{% if "worldInfo" in story %}
+		<details><summary>World info</summary>
+		{% for wi in story["worldInfo"] %}
+			{% if "keys" and "entry" in wi %}
+				<b>wi["keys"]</b>: wi["entry"]
+				<hr>
+			{% endif %}
+		</details>
+		{% endfor %}
+	{% endif %}
+	{% for action in story["actions"] %}
+		<span id="id_action" data-type="{{ action["type"] }}" date="{{ action["createdAt"] }}">
+			{{ action["text"] }}
+		</span>
+	{% endfor %}

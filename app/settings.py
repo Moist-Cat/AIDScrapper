@@ -1,9 +1,16 @@
+from pathlib import Path
+
 __all__ = ['stories_query', 'ccs', 'scenarios_query', 'subscen_query', 'headers', 'aid_loginpayload']
 
 aid = ['stories_query', 'ccs', 'scenarios_query', 'subscen_query', 'headers', 'aid_loginpayload']
 
 club = ['headers']
 
+# validation warnings
+WARNINGS = False
+
+# base path
+BASE_DIR = Path(__file__).resolve().parent
 stories_query = {
             "variables": {
                 "input": {
@@ -128,7 +135,7 @@ headers = {
             'content-type': 'application/json',
 }
 
-loginpayload = {
+aid_loginpayload = {
     "variables": {
         "identifier": "",
         "email": "",

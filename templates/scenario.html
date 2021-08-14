@@ -1,10 +1,5 @@
-{{ extends "base.html" }}
-	<li date="{{ scenario["createdAt"] }}">
-		<a href="scenarios/{{ scenario["title"] }}.html">
-			{{ scenario["title"] }}
-		</a>
-	</li>
-	<title>{{ scenario["title"] }}</title>
+{% extends "base.html" %}
+{% block body %}
 	<h1>{{ scenario["title"] }}</h1>
 		Created at: {{ scenario["createdAt"] }}<br>
 		Updated at: {{ scenario["updatedAt"] }}
@@ -25,9 +20,9 @@
 	{% if "options" in scenario %}
 		<h2>Options</h2>
 			<ul>
-				{{ for subscen in scenario["options"]  }}
+				{% for subscen in scenario["options"] %}
 					<li date="{{ scenario["createdAt"] }}">
-						<a name="link_subscenario" href="{{ scenario["title"]/{{ subscen["title"] }}.html">
+						<a name="link_subscenario" href="{{ scenario["title"] }}/{{ subscen["title"] }}.html">
 						    {{ subscen["title"] }}
 						</a>
 					</li>
@@ -37,7 +32,7 @@
 	{% if "worldInfo" in scenario %}
 		<details><summary><h2>World Info</h2></summary>
 			{% for wi in scenario["worldInfo"] %}
-				<b>{{ wi["keys"] }}</b>: wi["entry"]</hr>
+				<b>{{ wi["keys"] }}</b>: {{ wi["entry"] }}</hr>
 			{% endfor %}
 		</details>
 	{% endif %}
@@ -66,3 +61,4 @@
         	scenario["gameCode"]["onOutput"]
 		</pre>
 	{% endif %}
+{% endblock %}

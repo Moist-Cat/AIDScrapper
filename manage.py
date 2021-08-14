@@ -3,10 +3,11 @@ import json
 import sys
 import glob
 import getpass
+import os
 
 import bs4
 
-import app.client
+from app.client import AIDScrapper, ClubClient
 import to_html
 
 
@@ -26,28 +27,32 @@ def command(*args):
         actions="10"
 
 
-    if command not in ('publish', 'makenai', 'help'):
-        aid = client.AIDScrapper(title, actions)
+    if command in ('scenarios', 'stories', 'all'):
+        aid = AIDScrapper()
+        aid.adventures(title, actions)
+        aid.prompts(title)
+
+        aid.get_keys()
     elif command != 'help':
-        club = client.ClubClient()
+        club = ClubClient()
 
     if command == ('stories' or 'all'):
-        aid.get_stories(title, actions)
+        aid.get_stories()
         aid.adventures.dump()
-        to_html.scenario_to_html()
+        to_html.story_to_html()
 
     if command == ('scenarios' or 'all'):
-        aid.get_scenarios(title)
-        aid.prompt.dump()
+        aid.get_scenarios()
+        aid.prompts.dump()
         to_html.scenario_to_html()
 
-    if command == 'publish':
+    elif command == 'publish':
         club.publish(title)
     
-    if command == 'makenai':
+    elif command == 'makenai':
         scenario_to_json()
     
-    if command == 'fenix':
+    elif command == 'fenix':
         try:
             with open('scenario.json') as file:
                 data = json.load(file)
@@ -56,61 +61,12 @@ def command(*args):
             aid.get_scenarios()
             aid.prompt.dump()
             a.upload_in_bulk(aid.prompt.out)
-    if command == 'help':
-        print('''
-Usage: python manage.py [publish/stories/scenarios/makenai/fenix] [title] [min_number_of_actions]
+    
+    elif command == 'test':
+        os.system('python -m unittest -v app.tests')
 
--------------------
-
-Ex: python manage.py stories "My Story" 1000
-
-Downloads any story from your account named "My Story",
-then proceeds to dump it to the stories.json. mystuff_json_to_html.py is called
-then to convert the file to html, so be sure you named it that way. Also you need style.css to be
-in the folder too (is not important, so you can just make a blank file with that name).
-
-It will not download any story with less than 1000 actions in this case, if you want to download 
-any story with more than 1000 actions use:
-
-python manage.py stories \"\" 1000
-
-Note the \"\" and note that if you put python manage.py stories 1000 it will download any story 
-named \"1000\".
-
----------------------
-
-Ex: python manage.py scenarios "My Scenario"
-
-Same as before.
-
---------------------
-
-Ex: publish "My Scenario"
-
-Publishes a scenario which the given name. You must have it in stories.json in the directory.
-You need an account to do so, but you can register from here.
-
---------------------
-Ex: makenai
-
-Formats a .scenario file into a club friendly .json file, saved in stories.json
-You can publish it afterwards.
-
---------------------
-
-Ex: fenix
-
-Posts all your stuff (stored in the .json) on your account.
-
---------------------
-
-Ex: python manage.py all is the default, gets everything in your account (stories with
-less than 10 actions are ignored) and makes the html
-
---------------------
-
-(REMEMBER TO \"QUOTE\" the [title] option, or else it will give a nasty error.)
-        ''')        
+    elif command == 'help':
+        with open('help.txt') as file: print(file.read())
 
 def reformat_context(json_data):
 	# reformat the context as memory and AN
@@ -166,6 +122,7 @@ def scenario_to_json():
 	    # required param
 	    json_data['quests'] = []
 	    # compatibility
+	    json_data['title'] = json_data['title'].replace('/', '-')
 	    json_data['createdAt'] = ''
 	    json_data['updatedAt'] = '' 
 	    

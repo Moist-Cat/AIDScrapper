@@ -1,0 +1,52 @@
+Usage: python manage.py [publish/stories/scenarios/makenai/fenix] [title] [min_number_of_actions]
+
+-------------------
+
+Ex: python manage.py stories "My Story" 1000
+
+Downloads any story from your account named "My Story",
+then proceeds to dump it to the stories.json. mystuff_json_to_html.py is called
+then to convert the file to html, so be sure you named it that way. Also you need style.css to be
+in the folder too (is not important, so you can just make a blank file with that name).
+
+It will not download any story with less than 1000 actions in this case, if you want to download 
+any story with more than 1000 actions use:
+
+python manage.py stories \"\" 1000
+
+Note the \"\" and note that if you put python manage.py stories 1000 it will download any story 
+named \"1000\".
+
+---------------------
+
+Ex: python manage.py scenarios "My Scenario"
+
+Same as before.
+
+--------------------
+
+Ex: publish "My Scenario"
+
+Publishes a scenario which the given name. You must have it in stories.json in the directory.
+You need an account to do so, but you can register from here.
+
+--------------------
+Ex: makenai
+
+Formats a .scenario file into a club friendly .json file, saved in stories.json
+You can publish it afterwards.
+
+--------------------
+
+Ex: fenix
+
+Posts all your stuff (stored in the .json) on your account.
+
+--------------------
+
+Ex: python manage.py all is the default, gets everything in your account (stories with
+less than 10 actions are ignored) and makes the html
+
+--------------------
+
+(REMEMBER TO \"QUOTE\" the [title] option, or else it will give a nasty error.)
