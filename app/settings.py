@@ -6,8 +6,10 @@ aid = ['stories_query', 'ccs', 'scenarios_query', 'subscen_query', 'headers', 'a
 
 club = ['headers']
 
+holo = ['headers', 'generate_holo']
+
 # validation warnings
-WARNINGS = False
+WARNINGS = 0
 
 # base path
 BASE_DIR = Path(__file__).resolve().parent
@@ -132,8 +134,23 @@ headers = {
             'User-Agent':'Mozilla/5.0 (X11; Fedora; Linux x86_64) ' \
                          'AppleWebKit/537.36 (KHTML, like Gecko) ' \
                          'Chrome/90.0.4430.93 Safari/537.36',
-            'content-type': 'application/json',
 }
+"""
+accept-encoding: gzip, deflate, br
+accept-language: en-US,en;q=0.9
+content-length: 530
+content-type: application/json
+cookie: session=%7B%22id%22%3A%220f3b276e-5524-4dc1-b215-4aad5b431daa%22%2C%22secret%22%3A%2253b5f782-0d8b-4aa8-bae4-83b99fa3237d%22%7D; __stripe_mid=fa0bc3c1-9804-44dd-8c44-a67e02aa807d683646; __stripe_sid=7e6c88be-db39-4aac-85be-bb120122b168bd3c9a
+dnt: 1
+origin: https://www.writeholo.com
+referer: https://www.writeholo.com/write
+sec-ch-ua: " Not A;Brand";v="99", "Chromium";v="90"
+sec-ch-ua-mobile: ?0
+sec-fetch-dest: empty
+sec-fetch-mode: cors
+sec-fetch-site: same-origin
+user-agent: Mozilla/5.0 (X11; Fedora; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.93 Safari/537.36
+"""
 
 aid_loginpayload = {
     "variables": {
@@ -199,3 +216,33 @@ make_WI_payload = {
             __typename
     """
 }
+
+"https://www.writeholo.com/api/draw_completions"
+generate_holo = {
+	"story_id":"",
+	"model_name":"goodreads-2-5",
+	"input":[{
+		"label":"prefix",
+		"base_content":"{\"source\":\"literotica\",\"identifier\":930290,\"category\":\"\",\"author\":\"RavenSun\",\"rating\":4.98,\"tags\":[],\"view_count\":101409,\"series_meta\":null,\"location\":0,\"length\":5000}\n"},
+		{
+		"cutoff_settings":{
+			"ellipsis":True,
+			"cutoff_direction":"left",
+			"strategy":{
+				"priority":4,
+				"max_length":1500,
+				"min_length":1024}
+			},
+			"label":"prompt",
+			"base_content":""
+		}
+	]
+}
+"https://www.writeholo.com/api/create_story"
+# Not required? OwO
+"""
+holo_create_story = {
+	"story_title":"",
+	"prompt":"{\"version\":6,\"title\":\"Title here\",\"content\":[{\"type\":\"paragraph\",\"children\":[{\"type\":\"text\",\"text\":\"Replace this with at least a few sentences before generating.\"}]}],\"memory\":\"\",\"authorsNote\":\"\",\"worldInfo\":[],\"snippets\":[],\"genMeta\":{\"dataset\":0,\"literotica\":{\"author\":\"\",\"category\":\"\",\"tags\":[],\"targetLength\":5000},\"goodreads\":{\"author\":\"\",\"pubDate\":2020,\"tags\":[],\"targetLength\":25000}},\"target_length\":25000,\"forkedFrom\":null}"
+}
+"""

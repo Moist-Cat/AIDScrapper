@@ -5,6 +5,7 @@ from typing import Any, Type, Tuple, Dict
 import time
 
 from .models import Story, Scenario
+from .obfuscate import get_tor_session, renew_connection
 from . import settings
 
 class AIDScrapper:
@@ -30,8 +31,14 @@ class AIDScrapper:
 
     def __delete__(self):
         self.session.close()
+    
+    def quit(self):
+        self.session.close()
 
-    def get_keys(self, username, password):
+    def logout(self):
+        self.session.headers.update({'x-access-token':''})
+
+    def log_in(self, username, password):
         try:
             with open('token.txt') as file:
                 key = file.read()
@@ -300,6 +307,72 @@ class ClubClient:
                 print(f'Your prompts number is {res.url.split("/")[-1]}')
                 # I don't want to overload his servers...
                 time.sleep(1)
+
+class HoloClient():
+
+    def __init__(self):
+        
+        self.base_url = 'https://writeholo.com/'
+        self.url = self.base_url + 'api/'
+        self.session = requests.Session()
+
+
+        # Get all settings
+        for setting in settings.holo:
+            setattr(self, setting, getattr(settings, setting))
+
+        # requests settings
+        self.session = requests.Session()
+        self.session.headers.update(settings.headers)
+        
+        self.curr_story_id = ''
+
+    def __delete__(self):
+        self.session.close()
+    
+    def quit(self):
+        self.session.close()
+
+    def renew(self):
+        while True:
+            renew_connection()
+            self.session = get_tor_session(self.session)
+            try:
+                self.curr_story_id = self.create_scenario()
+            except json.decoder.JSONDecodeError:
+                time.sleep(1)
+                print('Fail...')
+                continue
+            else:
+                break
+            
+    def login(self, credentials: dict = {}):
+        # we need to get the cookies to interact with the API
+        res = self.session.get(self.base_url)
+        print(res)
+        if credentials:
+            # TODO
+            raise NotImplementedError
+        assert self.session.cookies
+
+    def logout(self):
+        self.session.cookies.clear()
+
+    def create_scenario(self):
+        res = self.session.post(self.url + 'create_story')
+        return res.json()['story_id']
+
+    def generate_output(self, context: dict = {}):
+        if not self.curr_story_id:
+            self.curr_story_id = self.create_scenario()
+
+        self.generate_holo['story_id'] = self.curr_story_id
+        payload = json.dumps(self.generate_holo)
+
+        res = self.session.post(self.url + 'draw_completions', data=payload)
+        return res.json()['outputs']
+
 if __name__ == '__main__':
     pass
 
+    

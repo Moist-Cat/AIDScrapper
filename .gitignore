@@ -15,8 +15,3 @@ __pycache__/
 # backups
 backups/
 !/backups/.gitkeep
-
-# test files, they need a token to test against the 
-# real server
-test_files/
-tests.py
