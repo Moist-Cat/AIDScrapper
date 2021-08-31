@@ -1,10 +1,13 @@
-from . import settings
 import json
 import datetime
 from warnings import warn
 
+from .logging import log_error, log
+from . import settings
+
 warnings = settings.WARNINGS
-path = settings.BASE_DIR
+BASE_DIR = settings.BASE_DIR
+print(BASE_DIR)
 
 
 class ValidationError(Exception):
@@ -77,21 +80,40 @@ class AIDObject:
                 final_warning = '\n'.join([invalid_title, invalid_action_total])
 
                 warn(final_warning)
-
             raise
         else:
             # So the data is not appended even if the exception is handled
             self.out.append(data)
 
     def dump(self):
-        with open(path / f'{self.__class__.__name__.lower()}.json', 'w') as file:
-            json.dump(self.data, file)
-        with open(
-            path / f'backups/{lower(self.__class__.__name__).lower()}' \
-                   f'_{datetime.today()}.json', 'w'
-        ) as file:
-            json.dump(self.data, file)
-        
+        try:
+            with open(BASE_DIR / f'{self.__class__.__name__.lower()}.json', 'w') as file:
+                json.dump(self.out, file)
+            with open(
+                BASE_DIR / f'backups/{self.__class__.__name__.lower()}' \
+                       f'_{datetime.today()}.json', 'w'
+            ) as file:
+                json.dump(self.out, file)
+        except json.decoder.JSONDecodeError:
+            log_error(
+                'Error while dumping the data. Validated data:' \
+                f'{self.out if len(self.out) < 50 else self.out[:20]}'
+            )
+   
+    def load(self):
+        try:
+            with open(BASE_DIR / f'{self.__class__.__name__.lower()}.json') as file:
+                raw_data = json.load(file)
+            log(f'Loading data... {len(raw_data)} objects found, proceeding to validate.')
+            for scenario in raw_data:
+                try:
+                    self.add(scenario)
+                except ValidationError:
+                    pass
+        except json.decoder.JSONDecodeError:
+            log_error(
+                f'Error while loading the data. {file.name} does not contain valid JSON.'
+            )
 
 class Scenario(AIDObject):
     def __init__(self, title=""):

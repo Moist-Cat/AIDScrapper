@@ -1,6 +1,5 @@
 # Scraped or sensitive data
-index*
-scen_index.html
+*index.html
 stories/
 scenarios/
 *.json
@@ -15,3 +14,7 @@ __pycache__/
 # backups
 backups/
 !/backups/.gitkeep
+
+#logs
+client.error
+client.log

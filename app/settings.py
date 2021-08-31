@@ -1,8 +1,27 @@
 from pathlib import Path
+import json
+import warnings
 
-__all__ = ['stories_query', 'ccs', 'scenarios_query', 'subscen_query', 'headers', 'aid_loginpayload']
+class ImproperlyConfigured(Exception):
+    pass
 
-aid = ['stories_query', 'ccs', 'scenarios_query', 'subscen_query', 'headers', 'aid_loginpayload']
+__all__ = [
+    'stories_query',
+    'ccs',
+    'scenarios_query',
+    'subscen_query',
+    'headers',
+    'aid_loginpayload',
+    'generate_holo',
+]
+
+aid = [
+    'stories_query',
+    'scenarios_query',
+    'subscen_query',
+    'headers',
+    'aid_loginpayload'
+]
 
 club = ['headers']
 
@@ -11,8 +30,31 @@ holo = ['headers', 'generate_holo']
 # validation warnings
 WARNINGS = 0
 
+# secrets
+try:
+    with open('secrets.json') as file: secrets = json.load(file)
+except FileNotFoundError:
+    if WARNINGS:
+        warnings.warn('File with credentials was not found.')
+
+def get_secret(secret):
+    try:
+        return secrets[secret]
+    except (NameError, KeyError):
+        raise ImproperlyConfigured(f'Setting {setting} was not found in your secrets.json file.')
+
 # base path
-BASE_DIR = Path(__file__).resolve().parent
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+# requests settings
+headers = {
+            'User-Agent':'Mozilla/5.0 (X11; Fedora; Linux x86_64) ' \
+                         'AppleWebKit/537.36 (KHTML, like Gecko) ' \
+                         'Chrome/90.0.4430.93 Safari/537.36',
+            'content-type': 'application/json'
+}
+
+# AID
 stories_query = {
             "variables": {
                 "input": {
@@ -130,28 +172,6 @@ subscen_query = {
         }
 """ + ccs).replace('\t', '')}
 
-headers = {
-            'User-Agent':'Mozilla/5.0 (X11; Fedora; Linux x86_64) ' \
-                         'AppleWebKit/537.36 (KHTML, like Gecko) ' \
-                         'Chrome/90.0.4430.93 Safari/537.36',
-}
-"""
-accept-encoding: gzip, deflate, br
-accept-language: en-US,en;q=0.9
-content-length: 530
-content-type: application/json
-cookie: session=%7B%22id%22%3A%220f3b276e-5524-4dc1-b215-4aad5b431daa%22%2C%22secret%22%3A%2253b5f782-0d8b-4aa8-bae4-83b99fa3237d%22%7D; __stripe_mid=fa0bc3c1-9804-44dd-8c44-a67e02aa807d683646; __stripe_sid=7e6c88be-db39-4aac-85be-bb120122b168bd3c9a
-dnt: 1
-origin: https://www.writeholo.com
-referer: https://www.writeholo.com/write
-sec-ch-ua: " Not A;Brand";v="99", "Chromium";v="90"
-sec-ch-ua-mobile: ?0
-sec-fetch-dest: empty
-sec-fetch-mode: cors
-sec-fetch-site: same-origin
-user-agent: Mozilla/5.0 (X11; Fedora; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.93 Safari/537.36
-"""
-
 aid_loginpayload = {
     "variables": {
         "identifier": "",
@@ -217,6 +237,7 @@ make_WI_payload = {
     """
 }
 
+# Holo
 "https://www.writeholo.com/api/draw_completions"
 generate_holo = {
 	"story_id":"",
