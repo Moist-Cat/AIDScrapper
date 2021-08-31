@@ -7,7 +7,6 @@ from . import settings
 
 warnings = settings.WARNINGS
 BASE_DIR = settings.BASE_DIR
-print(BASE_DIR)
 
 
 class ValidationError(Exception):

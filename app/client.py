@@ -9,7 +9,7 @@ import traceback
 from .models import Story, Scenario
 from .obfuscate import get_tor_session, renew_connection
 from .logging import log_error, log
-from . import settings
+from . import settings, logging
 
 def check_for_errors(request):
     def inner_func(cls, method, url, **kwargs):
@@ -21,7 +21,7 @@ def check_for_errors(request):
                 error_message = '\n-------------------ERROR-------------------------\n' \
                                 f'{str(datetime.today())} [fatal] Server URL: {url}), ' \
                                 f'failed while trying to connect.\n'
-                with open(settings.error_file, 'a') as error:
+                with open(logging.error_file, 'a') as error:
                     traceback.print_exc(file=error)
 
                 log('Something went wrong. Retrying...\n') 
@@ -46,9 +46,12 @@ def check_for_errors(request):
         return response
     return inner_func
 
-# Overrriden version of requests.Session that checks for errors 
-# after completing the request.
 class Session(requests.Session):
+    """
+    Overrriden version of requests.Session that checks for errors 
+    after completing the request.
+    """
+
     @check_for_errors
     def request(self, method, url, **kwargs):
         return super().request(method, url, **kwargs)
@@ -83,7 +86,7 @@ class BaseClient:
         self.session = get_tor_session(self.session)
 
     def login(self):
-        raise NotImplementedError('You must override this method in the subclass')
+        return NotImplemented
     
     def logout(self):
         self.session.headers = settings.headers
@@ -111,8 +114,8 @@ class AIDScrapper(BaseClient):
     def login(self, username='', password=''):
         if not username and password:
             try:
-                username = settings.get_setting('AID_USERNAME')
-                password = settings.get_setting('AID_PASSWORD')
+                username = settings.get_secret('AID_USERNAME')
+                password = settings.get_secret('AID_PASSWORD')
             except settings.ImproperlyConfigured:
                 username = input('Your username or e-mail: ')
                 password = getpass.getpass('Your password: ')
@@ -124,17 +127,12 @@ class AIDScrapper(BaseClient):
     def _get_object(query):
         query['variables']['input']['searchTerm'] = self.adventures.title
 
-        res = self.session.post(
+        return self.session.post(
             self.url,
             data=json.dumps(
                 query
             )
-        )
-
-        res = res.json()
-
-        result = res['data']
-        return result
+        ).json()['data']
 
     def get_stories(self):
         while True:
@@ -243,10 +241,6 @@ class ClubClient(BaseClient):
         for setting in settings.club:
             setattr(self, setting, getattr(settings, setting))
 
-        # requests settings
-        self.session = Session()
-        self.session.headers.update(self.headers)
-
     def _post(self, obj_url, params):
         url = self.url + obj_url
         self.session.headers.update(dict(Referer=url))
@@ -255,7 +249,7 @@ class ClubClient(BaseClient):
 
         res = self.session.post(url, data=params)
 
-    def _get_scenario_tags(self, tags):
+    def reformat_tags(self, tags):
         nsfw = 'false'
         tags_str = ', '.join(tag for tag in tags)
         for tag in tags:
@@ -306,7 +300,7 @@ class ClubClient(BaseClient):
             if scenario['title'] == title or title == '*':
                 # prepare the request
                 # prepare tags
-                tags = self._get_scenario_tags(scenario['tags'])
+                tags = self.reformat_tags(scenario['tags'])
 
                 try:
                     quests = "\n".join(scenario['quests']['quest'])
@@ -354,10 +348,6 @@ class HoloClient(BaseClient):
         for setting in settings.holo:
             setattr(self, setting, getattr(settings, setting))
 
-        # requests settings
-        self.session = Session()
-        self.session.headers.update(settings.headers)
-        
         self.curr_story_id = ''
             
     def login(self, credentials: dict = {}):
@@ -381,8 +371,3 @@ class HoloClient(BaseClient):
 
         res = self.session.post(self.url + 'draw_completions', data=payload)
         return res.json()['outputs']
-
-if __name__ == '__main__':
-    pass
-
-    
