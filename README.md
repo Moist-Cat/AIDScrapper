@@ -22,5 +22,4 @@ Added/Changed functions:
 Needs BeautifulSoup and requests for scraping.
 pip install -r requirements.txt to install all dependencies.
 
-After install type "python manage.py help" for commands or/and "python manage.py test" to... well, test the module functionality.
-
+After install type "python manage.py help" for commands or/and "python manage.py test" to... well, test the module functionalities.

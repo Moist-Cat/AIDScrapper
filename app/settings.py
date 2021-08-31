@@ -27,12 +27,20 @@ club = ['headers']
 
 holo = ['headers', 'generate_holo']
 
+# notice that '' is a catch-all. This does not 
+# include Untitled scenarios, though.
+default_title = ''
+default_min_action = 10
+
+# base path
+BASE_DIR = Path(__file__).resolve().parent.parent
+
 # validation warnings
-WARNINGS = 0
+WARNINGS = 1
 
 # secrets
 try:
-    with open('secrets.json') as file: secrets = json.load(file)
+    with open(BASE_DIR / 'app/secrets.json') as file: secrets = json.load(file)
 except FileNotFoundError:
     if WARNINGS:
         warnings.warn('File with credentials was not found.')
@@ -42,9 +50,6 @@ def get_secret(secret):
         return secrets[secret]
     except (NameError, KeyError):
         raise ImproperlyConfigured(f'Setting {setting} was not found in your secrets.json file.')
-
-# base path
-BASE_DIR = Path(__file__).resolve().parent.parent
 
 # requests settings
 headers = {

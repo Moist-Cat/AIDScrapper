@@ -1,7 +1,8 @@
-# fileops
+from .settings import BASE_DIR
+
 # default is linux console.
-error_file = '/dev/stdout' #BASE_DIR / 'client.error'
-log_file = '/dev/stdout' #BASE_DIR / 'client.log'
+error_file =  '/dev/stdout' #BASE_DIR / 'app/client.error'
+log_file = '/dev/stdout' #BASE_DIR / 'app/client.log'
 
 def log(msg):
     with open(log_file, 'a') as log:

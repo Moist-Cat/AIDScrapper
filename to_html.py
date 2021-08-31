@@ -16,8 +16,8 @@ def new_dir(folder):
             pass
     with open('style.css', 'r') as file:
         style = file.read()
-        with open(f'{folder}/style.css', 'w') as file:
-            file.write(style)
+    with open(f'{folder}/style.css', 'w') as file:
+        file.write(style)
 
 def story_to_html():
     new_dir('stories')
@@ -65,6 +65,7 @@ def scenario_to_html():
     subscen_paths = {}
     parent_scen = []
     for scenario in scenarios:
+        scenario['title'] == scenario['title'].replace('/', '-')
         if 'isOption' not in scenario or scenario['isOption'] != True:
             # base scenario, initializing the path
             scenario['path'] = f'scenarios/'
@@ -81,11 +82,13 @@ def scenario_to_html():
             scenario['path'] = subscen_paths[scenario['title']]
         if 'options' in scenario:
             for subscen in scenario['options']:
+                subscen['title'] = subscen['title'].replace('/', '-')
                 subscen['path'] = f'{scenario["path"]}{scenario["title"]}'
                 subscen_paths[subscen['title']] = subscen['path'] + '/'
                 new_dir(subscen['path'])
+                print(subscen['path'])
 
-                with open(f'{subscen["path"] + scenario["title"]}.html', 'w') as file:
+                with open(f'{subscen["path"]}/{subscen["title"]}.html', 'w') as file:
                     scen_templ = env.get_template('scenario.html')
                     file.write(
                         scen_templ.render({
@@ -94,6 +97,7 @@ def scenario_to_html():
                         })
                     )
 
+    print(subscen_paths)
     index = env.get_template('index.html')
     with open('scen_index.html', 'w') as outfile:
         outfile.write(

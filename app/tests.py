@@ -9,7 +9,7 @@ from .settings import BASE_DIR
 from .client import AIDScrapper
 from .models import Story, Scenario, ValidationError
 
-TEST_DIR = BASE_DIR / 'test_files'
+TEST_DIR = BASE_DIR / 'app/test_files'
 
 class TestModel(unittest.TestCase):
     def setUp(self):
@@ -23,15 +23,16 @@ class TestModel(unittest.TestCase):
     def test_story_validation(self):
         for story in self.stor_in:
             self.stories.add(story)
-        for story in self.stor_in:
-            self.assertIn(story, self.stories.out)
+            self.assertEqual(story['actions'], self.stories.out[-1]['actions'])
+    
+    def test_scenario_validation(self):
+        for scenario in self.scen_in:
+            self.scenarios.add(scenario)
+        for scenario in self.scen_in:
+            self.assertIn(scenario, self.scenarios.out)
 
-    def test_invalid_data_raises(self):
-        glowing_story = self.stor_in[0]
-        # must be copied separatedly, or else it would be 
-        # the same reference for both
-        too_few_actions = glowing_story.copy()
-        bad_title = glowing_story.copy()
+    def test_invalid_title_raises(self):
+        bad_title = self.stor_in[0]
        
         bad_title['title'] = 'not_sneed'
         self.stories.title = 'sneed'
@@ -40,18 +41,45 @@ class TestModel(unittest.TestCase):
             self.stories.add,
             bad_title
         )
-        bad_title['title'] = 'sneed'
-        
 
-        self.stories.title = ''
+        bad_title['title'] = 'sneed'
+        self.stories.add(bad_title)
+
+    def test_invalid_actions_raises(self):
+        too_few_actions = self.stor_in[0]
 
         too_few_actions['actions'] = [1,2,3,4,5,6,7,8,9,10]
+
         self.assertRaises(
             ValidationError,
             self.stories.add,
             too_few_actions
         )
+        
+        too_few_actions['actions'].append(11)
+        self.stories.add(too_few_actions)
 
+    def duplicate_scenario_raises(self):
+        duplicate_scenario = self.scen_in[0]
+
+        self.scenario.add(duplicate_scenario)
+
+        self.assertRaises(
+            ValidationError,
+            self.stories.add,
+            duplicate_scenario
+        )
+
+    def duplicate_story_raises(self):
+        duplicate_story = self.stor_in[0]
+
+        self.stories.add(duplicate_story)
+
+        self.assertRaises(
+            ValidationError,
+            self.stories.add,
+            duplicate_story
+        )
 @skip
 class TestDowloadFiles(unittest.TestCase):
 
@@ -74,7 +102,7 @@ class TestHtmlFiles(unittest.TestCase):
         with open(TEST_DIR / 'test_stories.json') as file:
             self.stor_in = json.load(file)
         with open(TEST_DIR / 'test_scen.json') as file:
-            self.scen_in = json.load(file)['scenarios']
+            self.scen_in = json.load(file)
 
     def tearDown(self):
         pass
@@ -101,7 +129,7 @@ class TestHtmlFiles(unittest.TestCase):
                 # we got the scenario we were looking for.
                 break
         else:
-            self.assertFail('The scenario is not even there. Check the other tests.')
+            raise AssertionError('The scenario is not even there. Check the other tests.')
 
         self.assert_if_exists(body, scenario['title'])
         self.assert_if_exists(body, scenario['description'])
