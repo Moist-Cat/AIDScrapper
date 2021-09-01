@@ -1,3 +1,5 @@
+import abc
+from abc import abstractmethod
 import json
 import datetime
 from warnings import warn
@@ -51,19 +53,24 @@ class AIDObject:
     
     def __len__(self) -> int:
         return len(self.out)
-
-    def _run_validation(self):
+    
+    @abstractmethod
+    def __contains__(self) -> bool:
         raise NotImplementedError('You must override this method in the subclass')
 
+    @abstractmethod
+    def _data_is_valid(self):
+        raise NotImplementedError('You must override this method in the subclass')
+
+    # --- core ---
+    @abstractmethod
     def validate(self, data: dict):
         raise NotImplementedError('You must override this method in the subclass')
+
 
     def add(self, dirty_data: dict):
         for k, v in dirty_data.items():
             if k in self.data.keys():
-                # get rid of "/"s that break paths
-                if k == 'title':
-                    v = v.replace('/', '-')
                 self.data[k] = v
             elif warnings:
                 if k not in ('type', 'score'):
@@ -71,7 +78,9 @@ class AIDObject:
                         f'{k} is not a valid value for ' \
                         f'a {self.__class__.__name__.lower()}'
                     )
-        self._run_validation()
+        if self._data_is_valid():
+            self.clean_titles(self.data)
+            self.out.append(self.data)
         self.data = self.data.fromkeys(self.data, '')
         self.data['createdAt'] = self.data['updatedAt'] = datetime.datetime.strftime(
                                                              datetime.datetime.today(),
@@ -94,6 +103,12 @@ class AIDObject:
             with open(self.default_json_file) as file:
                 raw_data = json.load(file)
             log(f'Loading data... {len(raw_data)} objects found, proceeding to validate.')
+            if type(raw_data) != list:
+                raise TypeError(
+                    f'Error while parsing the data. {file.name} json data is not ' \
+                    f'correctly formatted. {self.__class__.__name__}s must be placed '\
+                    'in an array (or list).'
+                )
             for scenario in raw_data:
                 try:
                     self.add(scenario)
@@ -104,6 +119,19 @@ class AIDObject:
                 f'Error while loading the data. {file.name} does not contain valid JSON.'
             )
 
+    # --- helpers ---
+    def clean_titles(self, data: dict):
+        data['title'] = data['title'].replace('/', '-').replace('\\', '-')
+        if 'options' in data:
+            data['options'] = [
+                option.update(
+                    {
+                        'title': option['title'].replace('/', '-').replace('\\', '-')
+                    }
+                ) for option in data['options']
+            ]
+        return data
+
 class Scenario(AIDObject):
     def __init__(self, title=settings.default_title):
         super().__init__()
@@ -112,16 +140,21 @@ class Scenario(AIDObject):
             "gameCode": None,
             "options": []
         })
-        # to make sure we don't get duplicates with scenarios
-        self.current_scenarios: set = set()
 
-    def _run_validation(self):
+    def __contains__(self, other) -> bool:
+        return any(s['title'] == other['title'] for s in self.out)
+
+    def _data_is_valid(self):
+        """
+        Here we handle the exceptions raised by validate() and 
+        give the apropriate warning.
+        """
         try:
             self.validate(self.data)
         except ValidationError:
             if warnings:
                 valid_title = not (not self.data['title'] or (self.title and self.data['title'] != self.title))
-                unique = not (self.data['title'] in self.current_scenarios)
+                unique = not (self.data in self)
                 
                 bad_title_msg = f', Should have been {self.title} got {self.data["title"]}'
                 is_duplicate_msg = f', A {self.__class__.__name__} titled {self.data["title"]} already exists'
@@ -136,14 +169,12 @@ class Scenario(AIDObject):
                 warn(final_warning)
             raise
         else:
-            # So the data is not appended even if the exception is handled
-            self.current_scenarios.add(self.data['title'])
-            self.out.append(self.data)
+            return True
 
     def validate(self, data: dict):
         if not data['title'] or \
                 (self.title and data['title'] != self.title
-        ) or data['title'] in self.current_scenarios:
+        ) or data in self:
             raise ValidationError
 
 class Story(AIDObject):
@@ -159,26 +190,20 @@ class Story(AIDObject):
             'actions': [],
             'undoneWindow': [],
         })
-        # with stories is a little more complicated. One would normally 
-        # think that grabbing the ID would be the best choice, but unless we 
-        # assign each one of them an ID ourselves and keep those stored there 
-        # is no way of knowing if a story is unique without checking it line by line
-        # doing so with thousand of stories would be pretty slow so we get the len() of 
-        # the story plus the title to get a unique "key".
-        # We are moving stories around so the date is not unique, by any means.
-        self.current_stories: set = set()
 
     def __contains__(self, other) -> bool:
-        raise any(s['title'] == other['title'] and len(s['actions']) == len(other['actions']) for s in self.out)
+        return any(
+            s['title'] == other['title'] and len(s['actions']) == len(other['actions']) for s in self.out
+        )
 
-    def _run_validation(self):
+    def _data_is_valid(self):
         try:
             self.validate(self.data)
         except ValidationError:
             if warnings:
                 valid_actions = not (len(self.data["actions"]) <= self.min_act)
                 valid_title = not (self.title and self.data['title'] != self.title)
-                unique = not ((self.data['title'], len(self.data['actions'])) in self.current_stories)
+                unique = not (self.data in self)
                 
                 bad_title_msg = f', Should have been {self.title} got {self.data["title"]}'
                 few_act_msg = f', Sould have been more than {self.min_act} got {len(self.data["actions"])}'
@@ -197,12 +222,10 @@ class Story(AIDObject):
                 warn(final_warning)
             raise
         else:
-            # So the data is not appended even if the exception is handled
-            self.current_stories.add((self.data['title'], len(self.data['actions'])))
-            self.out.append(self.data)
+            return True
 
     def validate(self, data: dict):
         if len(data['actions']) <= self.min_act or (
             self.title and data['title'] != self.title
-        ) or (data['title'], len(data['actions'])) in self.current_stories:
+        ) or data in self:
             raise ValidationError
