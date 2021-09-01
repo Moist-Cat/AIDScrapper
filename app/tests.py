@@ -28,8 +28,7 @@ class TestModel(unittest.TestCase):
     def test_scenario_validation(self):
         for scenario in self.scen_in:
             self.scenarios.add(scenario)
-        for scenario in self.scen_in:
-            self.assertIn(scenario, self.scenarios.out)
+            self.assertEqual(scenario['prompt'], self.scenarios.out[-1]['prompt'])
 
     def test_invalid_title_raises(self):
         bad_title = self.stor_in[0]

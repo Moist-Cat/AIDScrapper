@@ -49,7 +49,7 @@ class AIDObject:
         self.default_backups_file = BASE_DIR /  f'backups/{self.__class__.__name__.lower()}.json' \
                                      f'_{datetime.datetime.today()}.json'
     
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.out)
 
     def _run_validation(self):
@@ -113,7 +113,7 @@ class Scenario(AIDObject):
             "options": []
         })
         # to make sure we don't get duplicates with scenarios
-        self.current_scenarios: list = []
+        self.current_scenarios: set = set()
 
     def _run_validation(self):
         try:
@@ -137,7 +137,7 @@ class Scenario(AIDObject):
             raise
         else:
             # So the data is not appended even if the exception is handled
-            self.current_scenarios.append(self.data['title'])
+            self.current_scenarios.add(self.data['title'])
             self.out.append(self.data)
 
     def validate(self, data: dict):
@@ -166,7 +166,10 @@ class Story(AIDObject):
         # doing so with thousand of stories would be pretty slow so we get the len() of 
         # the story plus the title to get a unique "key".
         # We are moving stories around so the date is not unique, by any means.
-        self.current_stories: list = []
+        self.current_stories: set = set()
+
+    def __contains__(self, other) -> bool:
+        raise any(s['title'] == other['title'] and len(s['actions']) == len(other['actions']) for s in self.out)
 
     def _run_validation(self):
         try:
@@ -195,7 +198,7 @@ class Story(AIDObject):
             raise
         else:
             # So the data is not appended even if the exception is handled
-            self.current_stories.append((self.data['title'], len(self.data['actions'])))
+            self.current_stories.add((self.data['title'], len(self.data['actions'])))
             self.out.append(self.data)
 
     def validate(self, data: dict):

@@ -88,7 +88,7 @@ def scenario_to_html():
                 new_dir(subscen['path'])
                 print(subscen['path'])
 
-                with open(f'{subscen["path"]}/{subscen["title"]}.html', 'w') as file:
+                with open(f'{subscen["path"]}/{scenario["title"]}.html', 'w') as file:
                     scen_templ = env.get_template('scenario.html')
                     file.write(
                         scen_templ.render({
