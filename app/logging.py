@@ -1,12 +1,23 @@
-from .settings import BASE_DIR
+#from .settings import BASE_DIR
+
+"""
+Quick and dirty logger for aids.
+"""
 
 # default is linux console.
-error_file =  '/dev/stdout' #BASE_DIR / 'app/client.error'
-log_file = '/dev/stdout' #BASE_DIR / 'app/client.log'
+ERROR_FILE =  '/dev/stdout' #BASE_DIR / 'app/client.error'
+LOG_FILE = '/dev/stdout' #BASE_DIR / 'app/client.log'
 
 def log(msg):
-    with open(log_file, 'a') as log:
-        log.write(msg + '\n')
+    """
+    Logs a message in whatever file is the current default.
+    """
+    with open(LOG_FILE, 'a') as log_file:
+        log_file.write(msg + '\n')
+
 def log_error(msg):
-    with open(error_file, 'a') as error:
-        error.write(msg + '\n')
+    """
+    Logs an error in whatever file is the current default.
+    """
+    with open(ERROR_FILE, 'a') as error_file:
+        error_file.write(msg + '\n')

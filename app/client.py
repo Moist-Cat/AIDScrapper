@@ -1,12 +1,16 @@
 import json
-import requests
 import getpass
-from typing import Any, Type, Tuple, Dict
+from typing import Dict, Sequence
 import time
 from datetime import datetime
 import traceback
+import requests
+try:
+    import bs4
+except ImportError:
+    bs4 = None
 
-from .models import Story, Scenario
+from .models import Story, Scenario, ValidationError
 from .obfuscate import get_tor_session, renew_connection
 from .logging import log_error, log
 from . import settings, logging
@@ -18,13 +22,13 @@ def check_for_errors(request):
             try:
                 response = request(cls, method, url, **kwargs)
             except requests.exceptions.ConnectionError:
-                error_message = '\n-------------------ERROR-------------------------\n' \
+                error_message = '-------------------ERROR-------------------------\n' \
                                 f'{str(datetime.today())} [fatal] Server URL: {url}), ' \
-                                f'failed while trying to connect.\n'
+                                f'failed while trying to connect.'
                 with open(logging.error_file, 'a') as error:
                     traceback.print_exc(file=error)
 
-                log('Something went wrong. Retrying...\n') 
+                log('Something went wrong. Retrying...')
                 log_error(error_message)
 
                 time.sleep(3)
@@ -37,10 +41,12 @@ def check_for_errors(request):
                 errors = response.json()['errors']
             except json.decoder.JSONDecodeError:
                 errors = 'No errors'
+            raw_response = response.content[:20] if len(response.content) > 50 else response.content
             error_message = '-------------------ERROR-------------------------\n' \
                             f'{str(datetime.today())} [crit] Server URL: {response.url}, ' \
-                            f'failed with status code ({response.status_code}). Errors: {errors}. ' \
-                            f'Raw response: {response.content[:20] if len(response.content) > 50 else response.content}\n'
+                            f'failed with status code ({response.status_code}). ' \
+                            f'Errors: {errors}. ' \
+                            f'Raw response: {raw_response}'
             log_error(error_message)
             raise
         return response
@@ -66,15 +72,18 @@ class BaseClient:
         self.session.headers.update(settings.headers)
         self._initial_logging()
     
-    def __delete__(self):
+    def __delete__(self, instance):
         self.session.close()
     
     def _initial_logging(self):
         message = '--------------------INIT-----------------------\n' \
-                  f'{str(datetime.today())}: {self.__class__.__name__} successfully initialized.\n'
+                  f'{str(datetime.today())}: {self.__class__.__name__} successfully initialized.'
         log(message)
     
     def quit(self):
+        """
+        Kill the client
+        """
         self.session.close()
 
     def renew(self):
@@ -85,10 +94,16 @@ class BaseClient:
         renew_connection()
         self.session = get_tor_session(self.session)
 
-    def login(self):
+    def login(self, credentials: Dict):
+        """
+        Login into the site using a dict credentials.
+        """
         return NotImplemented
     
     def logout(self):
+        """
+        Clean up the session to \"log-out\".
+        """
         self.session.headers = settings.headers
         self.session.cookies.clear()
 
@@ -97,22 +112,23 @@ class AIDScrapper(BaseClient):
     AID Client to make API calls via requests.
     """
     def __init__(self):
-        
         super().__init__()
         
         self.url = 'https://api.aidungeon.io/graphql'
 
         # Get all settings
-        for setting in settings.aid:
-            setattr(self, setting, getattr(settings, setting))
+        self.stories_query = settings.stories_query
+        self.scenarios_query = settings.scenarios_query
+        self.subscen_query = settings.subscen_query
+        self.aid_loginpayload = settings.aid_loginpayload
 
         self.adventures = Story()
         self.prompts = Scenario()
 
         self.discarded_stories = 0
 
-    def login(self, username='', password=''):
-        if not username and password:
+    def login(self, credentials = None):
+        if not credentials:
             try:
                 username = settings.get_secret('AID_USERNAME')
                 password = settings.get_secret('AID_PASSWORD')
@@ -120,11 +136,16 @@ class AIDScrapper(BaseClient):
                 username = input('Your username or e-mail: ')
                 password = getpass.getpass('Your password: ')
 
-        key = self.get_login_token(username, password)
+        key = self.get_login_token(
+            {
+            'username': credentials['username'],
+            'password': credentials['password']
+            }
+        )
 
         self.session.headers.update({'x-access-token': key})
 
-    def _get_object(query):
+    def _get_object(self, query: Dict):
         query['variables']['input']['searchTerm'] = self.adventures.title
 
         return self.session.post(
@@ -136,30 +157,33 @@ class AIDScrapper(BaseClient):
 
     def get_stories(self):
         while True:
-            log('Getting a page of stories...\n')
+            self.stories_query['variables']['input']['searchTerm'] = self.adventures.title
+            log('Getting a page of stories...')
             
-            result = _get_object(self.stories_query)['user']['search']
+            result = self._get_object(self.stories_query)['user']['search']
 
             if result:
                 for story in result:
                     try:
-                        self.adventure.add(story)
+                        self.adventures.add(story)
                     except ValidationError:
                         self.discarded_stories += 1
-                    log(f'Got {len(self.adventure)} stories so far\n')
-                self.stories_query['variables']['input']['offset'] = len(self.adventure) + self.discarded_stories
+                    log(f'Got {len(self.adventures)} stories so far')
+                self.stories_query['variables']['input']['offset'] = len(
+                                                                         self.adventures
+                                                                     ) + self.discarded_stories
             else:
-                log('Looks like there\'s no more.\n')
+                log('Looks like there\'s no more.')
                 # return discarded stories to 0, since we are done
                 self.discarded_stories = 0
                 break
 
     def get_scenarios(self):
         while True:
-            self.scenarios_query['variables']['input']['searchTerm'] = name
-            log('Getting a page of scenarios...\n')
+            self.scenarios_query['variables']['input']['searchTerm'] = self.prompts.title
+            log('Getting a page of scenarios...')
             
-            result = _get_object(self.scenarios_query)['user']['search']
+            result = self._get_object(self.scenarios_query)['user']['search']
 
             if len(result):
                 for scenario in result:
@@ -167,24 +191,24 @@ class AIDScrapper(BaseClient):
                         self.prompts.add(scenario)
                     except ValidationError:
                         self.discarded_stories += 1
-                    if type(scenario['options']) is list:
+                    if isinstance(scenario['options'], Sequence):
                         for option in scenario['options']:
                             self.get_subscenario(option['publicId'])
                             # don not count suscens
                             self.discarded_stories -= 1
-                    log('Got {len(self.prompts)} scenarios so far\n')
+                    log('Got {len(self.prompts)} scenarios so far')
                 self.scenarios_query['variables'] \
                                     ['input'] \
                                     ['offset'] = len(
                                                      self.prompts
                                                  ) + self.discarded_stories
             else:
-                log('Looks like there\'s no more.\n')
+                log('Looks like there\'s no more.')
                 self.discarded_stories = 0
                 break
 
-    def get_subscenario(self, pubid):        
-        log(f'Getting subscenario {pubid}...\n')
+    def get_subscenario(self, pubid):
+        log(f'Getting subscenario {pubid}...')
 
         self.subscen_query['variables']['publicId'] = pubid
         
@@ -196,15 +220,15 @@ class AIDScrapper(BaseClient):
         except ValidationError:
             # With subscens there is no problem with offset
             pass
-        if type(result['options']) is list:
+        if isinstance(result['options'], Sequence):
             for option in result['options']:
                 self.get_subscenario(option['publicId'])
                 self.discarded_stories -= 1
 
-    def get_login_token(self, user, password):
+    def get_login_token(self, credentials: Dict):
         self.aid_loginpayload['variables']['identifier'] = \
-            self.aid_loginpayload['variables']['email'] = user
-        self.aid_loginpayload['variables']['password'] = password
+            self.aid_loginpayload['variables']['email'] = credentials["user"]
+        self.aid_loginpayload['variables']['password'] = credentials["password"]
         res = self.session.post(
             self.url,
             data=json.dumps(
@@ -213,33 +237,33 @@ class AIDScrapper(BaseClient):
         ).json()
         if 'data' in res:
             return res['data']['login']['accessToken']
-        else:            
-            log('no data?!\n')
+        log('no data?!')
+        return None
 
     def upload_in_bulk(self, stories):
+        #(XXX)
+        # Mental note: Find where I put the payload.
         for scenario in stories['scenarios']:
-            res = self.session.post(self.url,
+            self.session.post(self.url,
                 data=json.dumps(
                     self.create_scen_payload
                  )
             )
-            res = self.session.post(
+            self.session.post(
                 self.url,
                 data=json.dumps(
                     self.update_scen_payload
                 )
-            )            
-            log(f'{scenario["title"]} successfully uploaded...\n')
+            )
+            log(f'{scenario["title"]} successfully uploaded...')
 
 
 class ClubClient(BaseClient):
 
     def __init__(self):
-        self.url = 'https://prompts.aidg.club/'
+        super().__init__()
 
-        # Get all settings
-        for setting in settings.club:
-            setattr(self, setting, getattr(settings, setting))
+        self.url = 'https://prompts.aidg.club/'
 
     def _post(self, obj_url, params):
         url = self.url + obj_url
@@ -247,7 +271,7 @@ class ClubClient(BaseClient):
 
         params['__RequestVerificationToken'] = self.get_secret_token(url)
 
-        res = self.session.post(url, data=params)
+        self.session.post(url, data=params)
 
     def reformat_tags(self, tags):
         nsfw = 'false'
@@ -263,31 +287,46 @@ class ClubClient(BaseClient):
         hidden_token = body.find('input', {'name': '__RequestVerificationToken'})
         return hidden_token.attrs['value']
 
-    def register(self):
+    def register(self, credentials: Dict=None):
         params = {
                  'ReturnUrl': '',
                  'Honey': '',
-                 'Username': input('Username: '),
-                 'Password': getpass.getpass('Password: '),
-                 'PasswordConfirm': getpass.getpass('Password(Again): ')
-        }
+                 'Username': '',
+                 'Password': '',
+                 'PasswordConfirm': ''
+        }.update(credentials)
+        if not credentials:
+            params.update(
+                {
+                'Username': input('Username: '),
+                'Password': getpass.getpass('Password: '),
+                'PasswordConfirm': getpass.getpass('Password(Again): ')
+                }
+            )
 
-        res = self._post('user/register/', params)
+        self._post('user/register/', params)
 
 
-    def login(self):
+    def login(self, credentials: Dict=None):
         params = {
                  'ReturnUrl': '',
                  'Honey': '',
-                 'Username': input('Username: '),
-                 'Password': getpass.getpass('Password: ')
-        }
+                 'Username': '',
+                 'Password': ''
+        }.update(credentials)
+        if not credentials:
+            params.update(
+                {
+                'Username': input('Username: '),
+                'Password': getpass.getpass('Password: ')
+                }
+            )
 
-        res = self._post('user/login/', params)
+        self._post('user/login/', params)
 
     def publish(self, title=''):
         """
-        Publish a scenario with the given name to the club.
+        Publish a scenario with a given name to the club.
         """
 
         # variables
@@ -297,7 +336,7 @@ class ClubClient(BaseClient):
             infile = json.load(file)
 
         for scenario in infile['scenarios']:
-            if scenario['title'] == title or title == '*':
+            if title in (scenario['title'], '*'):
                 # prepare the request
                 # prepare tags
                 tags = self.reformat_tags(scenario['tags'])
@@ -331,7 +370,7 @@ class ClubClient(BaseClient):
                 except KeyError:
                     pass
 
-                res = session.post(variables[1], params)
+                res = self.session.post(variables[1], params)
 
                 print(f'Your prompts number is {res.url.split("/")[-1]}')
                 # I don't want to overload his servers...
@@ -340,19 +379,19 @@ class ClubClient(BaseClient):
 class HoloClient(BaseClient):
 
     def __init__(self):
-        
+        super().__init__()
+
         self.base_url = 'https://writeholo.com/'
         self.url = self.base_url + 'api/'
 
         # Get all settings
-        for setting in settings.holo:
-            setattr(self, setting, getattr(settings, setting))
+        self.generate_holo = settings.generate_holo
 
         self.curr_story_id = ''
             
-    def login(self, credentials: dict = {}):
+    def login(self, credentials: Dict = None):
         # we need to get the cookies to interact with the API
-        res = self.session.get(self.base_url)
+        self.session.get(self.base_url)
         if credentials:
             # TODO
             raise NotImplementedError
@@ -362,11 +401,12 @@ class HoloClient(BaseClient):
         res = self.session.post(self.url + 'create_story')
         return res.json()['story_id']
 
-    def generate_output(self, context: dict = {}):
+    def generate_output(self, context: Dict = None):
         if not self.curr_story_id:
             self.curr_story_id = self.create_scenario()
 
         self.generate_holo['story_id'] = self.curr_story_id
+        self.generate_holo.update(context)
         payload = json.dumps(self.generate_holo)
 
         res = self.session.post(self.url + 'draw_completions', data=payload)

@@ -1,7 +1,5 @@
-import sys
 import os
 import json
-import html
 
 from jinja2 import Environment, FileSystemLoader
 
@@ -21,7 +19,8 @@ def new_dir(folder):
 
 def story_to_html():
     new_dir('stories')
-    stories = json.load(open('stories.json'))
+    with open('stories.json') as file:
+        stories = json.load(file)
 
     story_templ = env.get_template('story.html')
     story_number = {}
@@ -60,15 +59,16 @@ def story_to_html():
 
 def scenario_to_html():
     new_dir('scenarios')
-    scenarios = json.load(open('scenario.json'))
+    with open('scenario.json') as file:
+        scenarios = json.load(file)
 
     subscen_paths = {}
     parent_scen = []
     for scenario in scenarios:
         scenario['title'] == scenario['title'].replace('/', '-')
-        if 'isOption' not in scenario or scenario['isOption'] != True:
+        if 'isOption' not in scenario or not scenario['isOption']:
             # base scenario, initializing the path
-            scenario['path'] = f'scenarios/'
+            scenario['path'] = 'scenarios/'
             with open(f'{scenario["path"] + scenario["title"]}.html', 'w') as file:
                 scen_templ = env.get_template('scenario.html')
                 file.write(

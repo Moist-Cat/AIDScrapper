@@ -5,28 +5,6 @@ import warnings
 class ImproperlyConfigured(Exception):
     pass
 
-__all__ = [
-    'stories_query',
-    'ccs',
-    'scenarios_query',
-    'subscen_query',
-    'headers',
-    'aid_loginpayload',
-    'generate_holo',
-]
-
-aid = [
-    'stories_query',
-    'scenarios_query',
-    'subscen_query',
-    'headers',
-    'aid_loginpayload'
-]
-
-club = ['headers']
-
-holo = ['headers', 'generate_holo']
-
 # notice that '' is a catch-all. This does not 
 # include Untitled scenarios, though.
 default_title = ''
@@ -35,7 +13,8 @@ default_min_action = 10
 # base path
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# validation warnings
+# validation warnings. Remember to set this to 0 in production if you 
+# do not want hundreds of warnings overflowing your screen.
 WARNINGS = 1
 
 # secrets
@@ -49,7 +28,9 @@ def get_secret(secret):
     try:
         return secrets[secret]
     except (NameError, KeyError):
-        raise ImproperlyConfigured(f'Setting {setting} was not found in your secrets.json file.')
+        raise ImproperlyConfigured(
+            f'Setting {setting} was not found in your secrets.json file.'
+        )
 
 # requests settings
 headers = {
@@ -120,7 +101,7 @@ stories_query = {
 }
 
 # Scenarios
-ccs = """
+CSS = """
         fragment ContentCardSearchable on Scenario {
             id
             publicId
@@ -163,7 +144,7 @@ scenarios_query = {
                 }
             }
         }
-""" + ccs).replace('\t', '')}
+""" + CSS).replace('\t', '')}
 
 subscen_query = {
             "variables": {
@@ -175,7 +156,7 @@ subscen_query = {
                 ...ContentCardSearchable
             }
         }
-""" + ccs).replace('\t', '')}
+""" + CSS).replace('\t', '')}
 
 aid_loginpayload = {
     "variables": {

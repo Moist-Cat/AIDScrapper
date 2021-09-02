@@ -1,4 +1,3 @@
-import os
 import json
 import unittest
 from unittest import skip
@@ -11,12 +10,17 @@ from .models import Story, Scenario, ValidationError
 
 TEST_DIR = BASE_DIR / 'app/test_files'
 
+def do_regex(string):
+    return f'[{string}]'
+
 class TestModel(unittest.TestCase):
     def setUp(self):
         self.stories = Story()
-        with open(TEST_DIR / 'test_stories.json') as file: self.stor_in = json.load(file)
+        with open(TEST_DIR / 'test_stories.json') as file:
+            self.stor_in = json.load(file)
         self.scenarios = Scenario()
-        with open(TEST_DIR / 'test_scen.json') as file: self.scen_in = json.load(file)
+        with open(TEST_DIR / 'test_scen.json') as file:
+            self.scen_in = json.load(file)
     def tearDown(self):
         pass
 
@@ -24,7 +28,7 @@ class TestModel(unittest.TestCase):
         for story in self.stor_in:
             self.stories.add(story)
             self.assertEqual(story['actions'], self.stories.out[-1]['actions'])
-    
+
     def test_scenario_validation(self):
         for scenario in self.scen_in:
             self.scenarios.add(scenario)
@@ -32,7 +36,7 @@ class TestModel(unittest.TestCase):
 
     def test_invalid_title_raises(self):
         bad_title = self.stor_in[0]
-       
+
         bad_title['title'] = 'not_sneed'
         self.stories.title = 'sneed'
         self.assertRaises(
@@ -54,14 +58,14 @@ class TestModel(unittest.TestCase):
             self.stories.add,
             too_few_actions
         )
-        
+
         too_few_actions['actions'].append(11)
         self.stories.add(too_few_actions)
 
     def duplicate_scenario_raises(self):
         duplicate_scenario = self.scen_in[0]
 
-        self.scenario.add(duplicate_scenario)
+        self.scenarios.add(duplicate_scenario)
 
         self.assertRaises(
             ValidationError,
@@ -83,17 +87,16 @@ class TestModel(unittest.TestCase):
 class TestDowloadFiles(unittest.TestCase):
 
     def setUp(self):
-        username = os.environ['AID_USERNAME']
-        password = os.environ['AID_PASSWORD']
-        client = AIDScrapper()
-        client.log_in(username, password)
+        self.client = AIDScrapper()
+        # you better have configured your secrets.json file.
+        self.client.login()
 
     def tearDown(self):
-        client.logout()
+        self.client.logout()
 
     def test_download(self):
-        client.download_scenarios('Mormonism')
-        client.download_stories('Mormonism')
+        self.client.get_scenarios('Mormonism')
+        self.client.get_stories('Mormonism')
 
 class TestHtmlFiles(unittest.TestCase):
 
@@ -106,15 +109,12 @@ class TestHtmlFiles(unittest.TestCase):
     def tearDown(self):
         pass
 
-    def do_regex(self, string):
-        return f'[{string}]'
-
     def assert_if_exists(self, body, element):
-        # formatting messes with the regex
+        # \"formatting\" is not compatible with the regex
         body = body.replace('[' and ']', '')
         element = element.replace('[' and ']', '')
         if element:
-            self.assertRegex(body, self.do_regex(element))
+            self.assertRegex(body, do_regex(element))
 
     def test_scenario_properly_formatted_to_html(self):
         # We pick a scenario with quests, rem, WI, etc.. to
@@ -153,7 +153,7 @@ class TestHtmlFiles(unittest.TestCase):
                 # we got the story we were looking for.
                 break
         else:
-            self.assertFail('The story is not even there. Check the other tests.')
+            raise AssertionError('The story is not even there. Check the other tests.')
 
         self.assert_if_exists(body, story['title'])
         self.assert_if_exists(body, story['description'])
@@ -178,7 +178,7 @@ class TestHtmlFiles(unittest.TestCase):
         # Discarded actions are counted, but we only care about 
         # the regular ones, so as long as every regular action is there...
         self.assertEqual(len(story['actions']), matches)
-        
+
         for wi in story['worldInfo']:
             self.assert_if_exists(body, wi['keys'])
             self.assert_if_exists(body, wi['entry'])
