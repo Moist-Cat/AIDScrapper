@@ -3,16 +3,16 @@ from abc import abstractmethod
 import json
 import datetime
 from warnings import warn
-from typing import Sequence
+from typing import Sequence, Any
 
-from .logging import log_error, log
-from . import settings
+from aids.app.writelogs import log_error, log
+from aids.app import settings
 
 WARNINGS = settings.WARNINGS
 BASE_DIR = settings.BASE_DIR
 
 
-def clean_titles(self, data: dict):
+def clean_titles(data: dict):
     data['title'] = data['title'].replace('/', '-').replace('\\', '-')
     if 'options' in data:
         data['options'] = [
@@ -62,11 +62,19 @@ class AIDObject(metaclass=abc.ABCMeta):
         self.default_backups_file = BASE_DIR /  f'backups/{self.__class__.__name__.lower()}.json' \
                                      f'_{datetime.datetime.today()}.json'
 
+    def __call__(self, title: str = '', min_act: str = 0):
+        """
+        To change the filters on-the-go. It could have been a regular method,
+        but this seems more intuitive
+        """
+        self.title = title
+        self.min_act = min_act
+
     def __len__(self) -> int:
         return len(self.out)
     
     @abstractmethod
-    def __contains__(self, other) -> bool:
+    def __contains__(self, other: Any) -> bool:
         raise NotImplementedError('You must override this method in the subclass')
 
     def _data_is_valid(self) -> bool:
@@ -117,7 +125,7 @@ class AIDObject(metaclass=abc.ABCMeta):
                     [object["title"] for object in self.out]
                 )
             log_error(
-                'Error while dumping the data. Validated data: {validated_data}'
+                f'Error while dumping the data. Validated data: {validated_data}'
             )
    
     def load(self):
@@ -156,7 +164,7 @@ class Scenario(AIDObject):
     def _data_is_valid(self):
         try:
             self.validate(self.data)
-        except ValidationError:
+        except ValidationError as val_err:
             if WARNINGS:
                 valid_title = not (not self.data['title'] or (self.title and self.data['title'] != self.title))
                 unique = not (self.data in self)
@@ -172,7 +180,7 @@ class Scenario(AIDObject):
                 final_warning = '\n'.join([invalid_title, is_duplicate])
 
                 warn(final_warning)
-            raise
+            raise ValidationError from val_err
         else:
             return True
         return False
@@ -186,8 +194,8 @@ class Scenario(AIDObject):
 class Story(AIDObject):
     def __init__(
         self,
-        title=settings.default_title,
-        min_act=settings.default_min_action
+        title=settings.DEFAULT_TITLE,
+        min_act=settings.DEFAULT_MIN_ACT
     ):
         super().__init__()
         self.title = title
@@ -205,7 +213,7 @@ class Story(AIDObject):
     def _data_is_valid(self):
         try:
             self.validate(self.data)
-        except ValidationError:
+        except ValidationError as val_err:
             if WARNINGS:
                 valid_actions = not (len(self.data['actions']) <= self.min_act)
                 valid_title = not (self.title and self.data['title'] != self.title)
@@ -226,7 +234,7 @@ class Story(AIDObject):
                 final_warning = '\n'.join([invalid_title, invalid_action_total, is_duplicate])
 
                 warn(final_warning)
-            raise
+            raise ValidationError from val_err
         else:
             return True
         return False

@@ -3,8 +3,8 @@ import sys
 import glob
 import os
 
-from app.client import AIDScrapper, ClubClient, bs4
-import to_html
+from aids.app.client import AIDScrapper, ClubClient, bs4
+import aids.to_html as to_html
 
 
 def run_command(*args):
@@ -28,7 +28,8 @@ def run_command(*args):
         aid.adventures(title, actions)
         aid.prompts(title)
 
-        aid.get_keys()
+        aid.login()
+
     elif command != 'help':
         club = ClubClient()
 
@@ -68,8 +69,8 @@ def run_command(*args):
                 aid.upload_in_bulk(data)
         except FileNotFoundError:
             aid.get_scenarios()
-            aid.prompt.dump()
-            aid.upload_in_bulk(aid.prompt.out)
+            aid.prompts.dump()
+            aid.upload_in_bulk(aid.prompts.out)
 
     elif command == 'test':
         os.system('python -m unittest -v app.tests')

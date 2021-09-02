@@ -7,10 +7,12 @@ class ImproperlyConfigured(Exception):
 
 # notice that '' is a catch-all. This does not 
 # include Untitled scenarios, though.
-default_title = ''
-default_min_action = 10
+DEFAULT_TITLE = ''
+DEFAULT_MIN_ACT = 10
 
 # base path
+# could be changed to cwd() to use this module from console after
+# a pip install.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # validation warnings. Remember to set this to 0 in production if you 
@@ -19,18 +21,19 @@ WARNINGS = 1
 
 # secrets
 try:
-    with open(BASE_DIR / 'app/secrets.json') as file: secrets = json.load(file)
+    with open(BASE_DIR / 'app/secrets.json') as file:
+        secrets = json.load(file)
 except FileNotFoundError:
     if WARNINGS:
         warnings.warn('File with credentials was not found.')
 
-def get_secret(secret):
+def get_secret(setting):
     try:
-        return secrets[secret]
-    except (NameError, KeyError):
+        return secrets[setting]
+    except (NameError, KeyError) as exc:
         raise ImproperlyConfigured(
             f'Setting {setting} was not found in your secrets.json file.'
-        )
+        ) from exc
 
 # requests settings
 headers = {

@@ -4,9 +4,9 @@ from unittest import skip
 
 from bs4 import BeautifulSoup as bs
 
-from .settings import BASE_DIR
-from .client import AIDScrapper
-from .models import Story, Scenario, ValidationError
+from aids.app.settings import BASE_DIR
+from aids.app.client import AIDScrapper
+from aids.app.models import Story, Scenario, ValidationError
 
 TEST_DIR = BASE_DIR / 'app/test_files'
 

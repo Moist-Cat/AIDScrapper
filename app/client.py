@@ -10,10 +10,10 @@ try:
 except ImportError:
     bs4 = None
 
-from .models import Story, Scenario, ValidationError
-from .obfuscate import get_tor_session, renew_connection
-from .logging import log_error, log
-from . import settings, logging
+from aids.app.models import Story, Scenario, ValidationError
+from aids.app.obfuscate import get_tor_session, renew_connection
+from aids.app.writelogs import log_error, log
+from aids.app import settings, writelogs
 
 def check_for_errors(request):
     def inner_func(cls, method, url, **kwargs):
@@ -25,7 +25,7 @@ def check_for_errors(request):
                 error_message = '-------------------ERROR-------------------------\n' \
                                 f'{str(datetime.today())} [fatal] Server URL: {url}), ' \
                                 f'failed while trying to connect.'
-                with open(logging.error_file, 'a') as error:
+                with open(writelogs.ERROR_FILE, 'a') as error:
                     traceback.print_exc(file=error)
 
                 log('Something went wrong. Retrying...')
@@ -54,7 +54,7 @@ def check_for_errors(request):
 
 class Session(requests.Session):
     """
-    Overrriden version of requests.Session that checks for errors 
+    Overrriden version of requests.Session that checks for errors
     after completing the request.
     """
 
@@ -71,24 +71,24 @@ class BaseClient:
         self.session = Session()
         self.session.headers.update(settings.headers)
         self._initial_logging()
-    
+
     def __delete__(self, instance):
         self.session.close()
-    
+
     def _initial_logging(self):
         message = '--------------------INIT-----------------------\n' \
                   f'{str(datetime.today())}: {self.__class__.__name__} successfully initialized.'
         log(message)
-    
+
     def quit(self):
         """
-        Kill the client
+        Kill the client.
         """
         self.session.close()
 
     def renew(self):
         """
-        Use Tor to fake our IP address. Note that couldfare is going to be a 
+        Use Tor to fake our IP address. Note that couldfare is going to be a
         PITA so this method is pretty useless as it is.
         """
         renew_connection()
@@ -99,7 +99,7 @@ class BaseClient:
         Login into the site using a dict credentials.
         """
         return NotImplemented
-    
+
     def logout(self):
         """
         Clean up the session to \"log-out\".
@@ -113,7 +113,7 @@ class AIDScrapper(BaseClient):
     """
     def __init__(self):
         super().__init__()
-        
+
         self.url = 'https://api.aidungeon.io/graphql'
 
         # Get all settings
@@ -135,13 +135,13 @@ class AIDScrapper(BaseClient):
             except settings.ImproperlyConfigured:
                 username = input('Your username or e-mail: ')
                 password = getpass.getpass('Your password: ')
+            finally:
+                credentials = {
+                    'username': username,
+                    'password': password
+                }
 
-        key = self.get_login_token(
-            {
-            'username': credentials['username'],
-            'password': credentials['password']
-            }
-        )
+        key = self.get_login_token(credentials)
 
         self.session.headers.update({'x-access-token': key})
 
@@ -159,7 +159,7 @@ class AIDScrapper(BaseClient):
         while True:
             self.stories_query['variables']['input']['searchTerm'] = self.adventures.title
             log('Getting a page of stories...')
-            
+
             result = self._get_object(self.stories_query)['user']['search']
 
             if result:
@@ -182,7 +182,7 @@ class AIDScrapper(BaseClient):
         while True:
             self.scenarios_query['variables']['input']['searchTerm'] = self.prompts.title
             log('Getting a page of scenarios...')
-            
+
             result = self._get_object(self.scenarios_query)['user']['search']
 
             if len(result):
@@ -211,9 +211,9 @@ class AIDScrapper(BaseClient):
         log(f'Getting subscenario {pubid}...')
 
         self.subscen_query['variables']['publicId'] = pubid
-        
+
         result = self._get_object(self.subscen_query)['scenario']
-        
+
         result['isOption'] = True
         try:
             self.prompts.add(result)
@@ -227,8 +227,8 @@ class AIDScrapper(BaseClient):
 
     def get_login_token(self, credentials: Dict):
         self.aid_loginpayload['variables']['identifier'] = \
-            self.aid_loginpayload['variables']['email'] = credentials["user"]
-        self.aid_loginpayload['variables']['password'] = credentials["password"]
+            self.aid_loginpayload['variables']['email'] = credentials['user']
+        self.aid_loginpayload['variables']['password'] = credentials['password']
         res = self.session.post(
             self.url,
             data=json.dumps(
@@ -388,12 +388,12 @@ class HoloClient(BaseClient):
         self.generate_holo = settings.generate_holo
 
         self.curr_story_id = ''
-            
+
     def login(self, credentials: Dict = None):
         # we need to get the cookies to interact with the API
         self.session.get(self.base_url)
         if credentials:
-            # TODO
+            #TODO
             raise NotImplementedError
         assert self.session.cookies
 
