@@ -62,10 +62,10 @@ class AIDObject(metaclass=abc.ABCMeta):
         self.default_backups_file = BASE_DIR /  f'backups/{self.__class__.__name__.lower()}.json' \
                                      f'_{datetime.datetime.today()}.json'
 
-    def __call__(self, title: str = '', min_act: str = 0):
+    def __call__(self, title: str = '', min_act: int = 0):
         """
         To change the filters on-the-go. It could have been a regular method,
-        but this seems more intuitive
+        but this seems more intuitive.
         """
         self.title = title
         self.min_act = min_act
@@ -150,7 +150,7 @@ class AIDObject(metaclass=abc.ABCMeta):
             )
 
 class Scenario(AIDObject):
-    def __init__(self, title=settings.default_title):
+    def __init__(self, title=settings.DEFAULT_TITLE):
         super().__init__()
         self.title = title
         self.data.update({

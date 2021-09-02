@@ -1,6 +1,6 @@
 import json
 import getpass
-from typing import Dict, Sequence
+from typing import Sequence
 import time
 from datetime import datetime
 import traceback
@@ -94,10 +94,11 @@ class BaseClient:
         renew_connection()
         self.session = get_tor_session(self.session)
 
-    def login(self, credentials: Dict):
+    def login(self, credentials: dict):
         """
         Login into the site using a dict credentials.
         """
+        credentials = credentials or {}
         return NotImplemented
 
     def logout(self):
@@ -145,7 +146,7 @@ class AIDScrapper(BaseClient):
 
         self.session.headers.update({'x-access-token': key})
 
-    def _get_object(self, query: Dict):
+    def _get_object(self, query: dict):
         query['variables']['input']['searchTerm'] = self.adventures.title
 
         return self.session.post(
@@ -225,7 +226,7 @@ class AIDScrapper(BaseClient):
                 self.get_subscenario(option['publicId'])
                 self.discarded_stories -= 1
 
-    def get_login_token(self, credentials: Dict):
+    def get_login_token(self, credentials: dict):
         self.aid_loginpayload['variables']['identifier'] = \
             self.aid_loginpayload['variables']['email'] = credentials['user']
         self.aid_loginpayload['variables']['password'] = credentials['password']
@@ -287,7 +288,9 @@ class ClubClient(BaseClient):
         hidden_token = body.find('input', {'name': '__RequestVerificationToken'})
         return hidden_token.attrs['value']
 
-    def register(self, credentials: Dict=None):
+    def register(self, credentials=None):
+        credentials = credentials or {}
+
         params = {
                  'ReturnUrl': '',
                  'Honey': '',
@@ -307,7 +310,9 @@ class ClubClient(BaseClient):
         self._post('user/register/', params)
 
 
-    def login(self, credentials: Dict=None):
+    def login(self, credentials = None):
+        credentials = credentials or {}
+
         params = {
                  'ReturnUrl': '',
                  'Honey': '',
@@ -389,7 +394,7 @@ class HoloClient(BaseClient):
 
         self.curr_story_id = ''
 
-    def login(self, credentials: Dict = None):
+    def login(self, credentials = None):
         # we need to get the cookies to interact with the API
         self.session.get(self.base_url)
         if credentials:
@@ -401,7 +406,7 @@ class HoloClient(BaseClient):
         res = self.session.post(self.url + 'create_story')
         return res.json()['story_id']
 
-    def generate_output(self, context: Dict = None):
+    def generate_output(self, context: dict = None):
         if not self.curr_story_id:
             self.curr_story_id = self.create_scenario()
 

@@ -65,7 +65,7 @@ def scenario_to_html():
     subscen_paths = {}
     parent_scen = []
     for scenario in scenarios:
-        scenario['title'] == scenario['title'].replace('/', '-')
+        scenario['title'] = scenario['title'].replace('/', '-')
         if 'isOption' not in scenario or not scenario['isOption']:
             # base scenario, initializing the path
             scenario['path'] = 'scenarios/'

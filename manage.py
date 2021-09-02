@@ -2,23 +2,24 @@ import json
 import sys
 import glob
 import os
+from typing import List
 
 from aids.app.client import AIDScrapper, ClubClient, bs4
 import aids.to_html as to_html
 
 
-def run_command(*args):
+def run_command(argv: List[str] = sys.argv[1:]):
     try:
-        command = args[0][1]
+        command = argv[1]
     except IndexError:
         # assume "all"
         command = "all"
     try:
-        title=args[0][2]
+        title=argv[2]
     except IndexError:
         title=""
     try:
-        actions = args[0][3]
+        actions = argv[3]
     except IndexError:
         actions="10"
 
@@ -143,4 +144,4 @@ def scenario_to_json():
         json.dump(scenario, file)
 
 if __name__ == '__main__':
-    run_command(sys.argv)
+    run_command()
