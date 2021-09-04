@@ -176,6 +176,74 @@ mutation ($identifier: String, $email: String, $password: String, $anonymousId: 
 """
 }
 
+create_scen_payload = {
+                      "variables":{},
+                      "query":"""mutation {
+                              createScenario {
+                                ...ScenarioEditScenario
+                                __typename
+                              }
+                            }
+                            fragment ScenarioEditScenario on Scenario {
+                              id
+                              publicId
+                              allowComments
+                              createdAt
+                              deletedAt
+                              description
+                              memory
+                              authorsNote
+                              mode
+                              musicTheme
+                              nsfw
+                              prompt
+                              published
+                              featured
+                              safeMode
+                              quests
+                              tags
+                              thirdPerson
+                              title
+                              updatedAt
+                              options {
+                                id
+                                publicId
+                                title
+                                __typename
+                              }
+                              ...ContentOptionsSearchable
+                              ...DeleteButtonSearchable
+                              __typename
+                            }
+                            fragment ContentOptionsSearchable on Searchable {
+                              id
+                              publicId
+                              published
+                              isOwner
+                              tags
+                              title
+                              userId
+                              ... on Savable {
+                                isSaved
+                                __typename
+                              }
+                              ... on Adventure {
+                                userJoined
+                                __typename
+                              }
+                              __typename
+                            }
+                            fragment DeleteButtonSearchable on Searchable {
+                              id
+                              publicId
+                              published
+                              __typename
+                            }
+"""
+}
+
+update_scen_payload = {"variables":{"input":{"publicId":"","title":"","description":"sneed","prompt":"","memory":"","authorsNote":"","quests":[],"musicTheme":None,"tags":[],"nsfw":False,"featured":False,"safeMode":True,"thirdPerson":False,"mode":"creative","allowComments":True}},"query":"mutation ($input: ScenarioInput) {\n  updateScenario(input: $input) {\n    ...ScenarioEditScenario\n    __typename\n  }\n}\n\nfragment ScenarioEditScenario on Scenario {\n  id\n  publicId\n  allowComments\n  createdAt\n  deletedAt\n  description\n  memory\n  authorsNote\n  mode\n  musicTheme\n  nsfw\n  prompt\n  published\n  featured\n  safeMode\n  quests\n  tags\n  thirdPerson\n  title\n  updatedAt\n  options {\n    id\n    publicId\n    title\n    __typename\n  }\n  ...ContentOptionsSearchable\n  ...DeleteButtonSearchable\n  __typename\n}\n\nfragment ContentOptionsSearchable on Searchable {\n  id\n  publicId\n  published\n  isOwner\n  tags\n  title\n  userId\n  ... on Savable {\n    isSaved\n    __typename\n  }\n  ... on Adventure {\n    userJoined\n    __typename\n  }\n  __typename\n}\n\nfragment DeleteButtonSearchable on Searchable {\n  id\n  publicId\n  published\n  __typename\n}\n"}
+
 update_WI_payload = {
     "variables": {
         "input": {
@@ -208,14 +276,14 @@ update_WI_payload = {
 make_WI_payload = {
     "variables": {
       "input": {
+        "contentPublicId": "",
+        "contentType": "scenario",
         "keys": "",
         "entry": "",
-        "type": "worldDescription",
+        "type": "Custom",
         "generator": "Manual",
         "hidden": False,
-        "isSelected": True,
-        "contentPublicId": "",
-        "contentType": "scenario"
+        "isSelected": False
       }
     },
     "query": """
@@ -226,33 +294,55 @@ make_WI_payload = {
     """
 }
 
-# Holo
-"https://www.writeholo.com/api/draw_completions"
-generate_holo = {
-	"story_id":"",
-	"model_name":"goodreads-2-5",
-	"input":[{
-		"label":"prefix",
-		"base_content":"{\"source\":\"literotica\",\"identifier\":930290,\"category\":\"\",\"author\":\"RavenSun\",\"rating\":4.98,\"tags\":[],\"view_count\":101409,\"series_meta\":null,\"location\":0,\"length\":5000}\n"},
-		{
-		"cutoff_settings":{
-			"ellipsis":True,
-			"cutoff_direction":"left",
-			"strategy":{
-				"priority":4,
-				"max_length":1500,
-				"min_length":1024}
-			},
-			"label":"prompt",
-			"base_content":""
-		}
-	]
+action_continue_payload = {
+    'variables': {
+        'input': {
+            'publicId': '',
+            'type': 'continue',
+            'characterName': None
+        }
+    }, 'query':"""
+            mutation ($input: ActionInput) {
+              addAction(input: $input) {
+                message
+                time
+                hasBannedWord
+                returnedInput
+                __typename
+               }
+           }
+       """
 }
-"https://www.writeholo.com/api/create_story"
+
+get_aid_user_payload =  {"variables":{"username": ""},"query":"query ($username: String) {\n  user(username: $username) {\n    id\n    friends {\n      ...UserTitleUser\n      ...FriendButtonUser\n      __typename\n    }\n    followers {\n      ...UserTitleUser\n      ...FollowButtonUser\n      __typename\n    }\n    following {\n      ...UserTitleUser\n      ...FollowButtonUser\n      __typename\n    }\n    __typename\n  }\n}\n\nfragment FollowButtonUser on User {\n  isCurrentUser\n  isFollowedByCurrentUser\n  __typename\n}\n\nfragment FriendButtonUser on User {\n  id\n  username\n  isCurrentUser\n  friendedCurrentUser\n  friendedByCurrentUser\n  __typename\n}\n\nfragment UserTitleUser on User {\n  id\n  username\n  icon\n  ...UserAvatarUser\n  __typename\n}\n\nfragment UserAvatarUser on User {\n  id\n  username\n  avatar\n  __typename\n}\n"}
+
+# Holo
+#https://www.writeholo.com/api/draw_completions
+generate_holo = {
+    "story_id":"",
+    "model_name":"goodreads-2-5",
+    "input":[{
+        "label":"prefix",
+        "base_content":"{\"source\":\"literotica\",\"identifier\":930290,\"category\":\"\",\"author\":\"RavenSun\",\"rating\":4.98,\"tags\":[],\"view_count\":101409,\"series_meta\":null,\"location\":0,\"length\":5000}\n"},
+        {
+        "cutoff_settings":{
+            "ellipsis":True,
+            "cutoff_direction":"left",
+            "strategy":{
+                "priority":4,
+                "max_length":1500,
+                "min_length":1024}
+            },
+            "label":"prompt",
+            "base_content":""
+        }
+    ]
+}
+#https://www.writeholo.com/api/create_story
 # Not required? OwO
 """
 holo_create_story = {
-	"story_title":"",
-	"prompt":"{\"version\":6,\"title\":\"Title here\",\"content\":[{\"type\":\"paragraph\",\"children\":[{\"type\":\"text\",\"text\":\"Replace this with at least a few sentences before generating.\"}]}],\"memory\":\"\",\"authorsNote\":\"\",\"worldInfo\":[],\"snippets\":[],\"genMeta\":{\"dataset\":0,\"literotica\":{\"author\":\"\",\"category\":\"\",\"tags\":[],\"targetLength\":5000},\"goodreads\":{\"author\":\"\",\"pubDate\":2020,\"tags\":[],\"targetLength\":25000}},\"target_length\":25000,\"forkedFrom\":null}"
+    "story_title":"",
+    "prompt":"{\"version\":6,\"title\":\"Title here\",\"content\":[{\"type\":\"paragraph\",\"children\":[{\"type\":\"text\",\"text\":\"Replace this with at least a few sentences before generating.\"}]}],\"memory\":\"\",\"authorsNote\":\"\",\"worldInfo\":[],\"snippets\":[],\"genMeta\":{\"dataset\":0,\"literotica\":{\"author\":\"\",\"category\":\"\",\"tags\":[],\"targetLength\":5000},\"goodreads\":{\"author\":\"\",\"pubDate\":2020,\"tags\":[],\"targetLength\":25000}},\"target_length\":25000,\"forkedFrom\":null}"
 }
 """

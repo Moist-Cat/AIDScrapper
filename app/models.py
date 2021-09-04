@@ -13,7 +13,10 @@ BASE_DIR = settings.BASE_DIR
 
 
 def clean_titles(data: dict):
-    data['title'] = data['title'].replace('/', '-').replace('\\', '-')
+    try:
+        data['title'] = data['title'].replace('/', '-').replace('\\', '-')
+    except AttributeError:
+        data['title'] = 'Untitled'
     if 'options' in data:
         data['options'] = [
             option.update(
@@ -58,9 +61,12 @@ class AIDObject(metaclass=abc.ABCMeta):
         }
         self.out: list = []
         
-        self.default_json_file = BASE_DIR / f'{self.__class__.__name__.lower()}.json'
-        self.default_backups_file = BASE_DIR /  f'backups/{self.__class__.__name__.lower()}.json' \
-                                     f'_{datetime.datetime.today()}.json'
+        # notice that - unlike the backup path - this one is relative
+        # using the module via commands from another directory will dump
+        # the stories to that directory
+        self.default_json_file =  f'{self.__class__.__name__.lower()}.json'
+        self.default_backups_file = BASE_DIR /  f'backups/' \
+                f'{self.__class__.__name__.lower()}_{datetime.datetime.today()}.json'
 
     def __call__(self, title: str = '', min_act: int = 0):
         """
@@ -133,7 +139,7 @@ class AIDObject(metaclass=abc.ABCMeta):
             with open(self.default_json_file) as file:
                 raw_data = json.load(file)
             log(f'Loading data... {len(raw_data)} objects found, proceeding to validate.')
-            if isinstance(raw_data, Sequence):
+            if not isinstance(raw_data, Sequence):
                 raise TypeError(
                     f'Error while parsing the data. {file.name} json data is not ' \
                     f'correctly formatted. {self.__class__.__name__}s must be placed '\
@@ -150,9 +156,11 @@ class AIDObject(metaclass=abc.ABCMeta):
             )
 
 class Scenario(AIDObject):
-    def __init__(self, title=settings.DEFAULT_TITLE):
+    def __init__(self, title: str = ''):
         super().__init__()
-        self.title = title
+
+        self.title = title or settings.DEFAULT_TITLE
+
         self.data.update({
             "gameCode": None,
             "options": []
@@ -164,7 +172,7 @@ class Scenario(AIDObject):
     def _data_is_valid(self):
         try:
             self.validate(self.data)
-        except ValidationError as val_err:
+        except ValidationError:
             if WARNINGS:
                 valid_title = not (not self.data['title'] or (self.title and self.data['title'] != self.title))
                 unique = not (self.data in self)
@@ -180,7 +188,6 @@ class Scenario(AIDObject):
                 final_warning = '\n'.join([invalid_title, is_duplicate])
 
                 warn(final_warning)
-            raise ValidationError from val_err
         else:
             return True
         return False
@@ -194,12 +201,14 @@ class Scenario(AIDObject):
 class Story(AIDObject):
     def __init__(
         self,
-        title=settings.DEFAULT_TITLE,
-        min_act=settings.DEFAULT_MIN_ACT
+        title: str = '',
+        min_act: int = 0
     ):
         super().__init__()
-        self.title = title
-        self.min_act = min_act
+
+        self.title = title or settings.DEFAULT_TITLE
+        self.min_act = min_act or settings.DEFAULT_MIN_ACT
+
         self.data.update({
             'actions': [],
             'undoneWindow': [],
@@ -213,7 +222,7 @@ class Story(AIDObject):
     def _data_is_valid(self):
         try:
             self.validate(self.data)
-        except ValidationError as val_err:
+        except ValidationError:
             if WARNINGS:
                 valid_actions = not (len(self.data['actions']) <= self.min_act)
                 valid_title = not (self.title and self.data['title'] != self.title)
@@ -234,7 +243,6 @@ class Story(AIDObject):
                 final_warning = '\n'.join([invalid_title, invalid_action_total, is_duplicate])
 
                 warn(final_warning)
-            raise ValidationError from val_err
         else:
             return True
         return False

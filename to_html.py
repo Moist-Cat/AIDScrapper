@@ -3,8 +3,10 @@ import json
 
 from jinja2 import Environment, FileSystemLoader
 
+from aids.app.settings import BASE_DIR
 
-env = Environment(loader=FileSystemLoader('templates'))
+
+env = Environment(loader=FileSystemLoader(BASE_DIR / 'templates'))
 
 def new_dir(folder):
     if folder:
@@ -12,14 +14,14 @@ def new_dir(folder):
             os.mkdir(folder)
         except FileExistsError:
             pass
-    with open('style.css', 'r') as file:
+    with open(BASE_DIR / 'static/style.css', 'r') as file:
         style = file.read()
     with open(f'{folder}/style.css', 'w') as file:
         file.write(style)
 
 def story_to_html():
     new_dir('stories')
-    with open('stories.json') as file:
+    with open('story.json') as file:
         stories = json.load(file)
 
     story_templ = env.get_template('story.html')
@@ -55,6 +57,13 @@ def story_to_html():
             })
         )
         htmlfile.close()
+    index = env.get_template('index.html')
+    with open('story_index.html', 'w') as outfile:
+        outfile.write(
+            index.render(
+                {'objects': stories, 'content_type': 'stories'
+            })
+        )
     print('Stories successfully formatted')
 
 def scenario_to_html():
@@ -97,12 +106,11 @@ def scenario_to_html():
                         })
                     )
 
-    print(subscen_paths)
     index = env.get_template('index.html')
     with open('scen_index.html', 'w') as outfile:
         outfile.write(
             index.render(
-                {'objects': parent_scen, 'content_type': 'scenario'
+                {'objects': parent_scen, 'content_type': 'scenarios'
             })
         )
     print('Scenarios successfully formatted')

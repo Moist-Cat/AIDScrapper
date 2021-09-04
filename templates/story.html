@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% block body %}
 	<li title="{{ story["createdAt"] }}">
 		<a href="stories/{{ story["title"] }}{{ story_number[story["title"]] }}.html">
 		    {{ story['title'] }}{{ story_number[story["title"]] }}
@@ -14,27 +15,34 @@
 	 </label>
 	<details>
 		<summary>
-		    Details
+		    Undone window
 		</summary>
-	<p id="id_title">
-		Description: {{ story["description"] }}
-	<br>Created at: {{ story["createdAt"] }}
-	<br>Updated at: {{ story["updatedAt"] }}
-	<br>Remember: {{ story["memory"] }}
-	<p id="id_an">Author's note: {{ story["authorsNote"] }}</p>
-	    <details>
-		{% for action in story["undoneWindow"] %}
+		<p id="id_title">
+			Description: {{ story["description"] }}
+		<br>Created at: {{ story["createdAt"] }}
+		<br>Updated at: {{ story["updatedAt"] }}
+		<br>Remember: {{ story["memory"] }}
+		<p id="id_an">Author's note: {{ story["authorsNote"] }}</p>
+	</details>
+    <details>
+	{% for action in story["undoneWindow"] %}
+		<span data-type="{{ action["type"] }}" date="{{ action["createdAt"] }}">
+		    {{ action["text"] }}
+		</span>
+		<hr>
+	{% endfor %}
+	</details>
+		{% for action in story["actions"] %}
 			<span data-type="{{ action["type"] }}" date="{{ action["createdAt"] }}">
-			    action["text"]
+			    {{ action["text"] }}
 			</span>
-			<hr>
-		</details>
 		{% endfor %}
-	{% if "worldInfo" in story %}
+
+	{% if "worldInfo" in story and story["worldInfo"] %}
 		<details><summary>World info</summary>
 		{% for wi in story["worldInfo"] %}
 			{% if "keys" and "entry" in wi %}
-				<b>wi["keys"]</b>: wi["entry"]
+				<b>{{ wi["keys"] }}</b>: {{ wi["entry"] }}
 				<hr>
 			{% endif %}
 		</details>
@@ -45,3 +53,4 @@
 			{{ action["text"] }}
 		</span>
 	{% endfor %}
+{% endblock %}

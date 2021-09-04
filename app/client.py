@@ -1,19 +1,31 @@
 import json
 import getpass
-from typing import Sequence
+from typing import Sequence, List, Dict
 import time
 from datetime import datetime
 import traceback
+import random
+import re
 import requests
 try:
     import bs4
 except ImportError:
     bs4 = None
+import stem
 
-from aids.app.models import Story, Scenario, ValidationError
+from aids.app.models import Story, Scenario
 from aids.app.obfuscate import get_tor_session, renew_connection
 from aids.app.writelogs import log_error, log
 from aids.app import settings, writelogs
+
+# this import must go after settings bacause we might need them
+# to use our "fake-headers"
+try:
+    from fake_headers import Headers
+except ImportError:
+    class Headers:
+        def generate(self):
+            return re.sub(settings.headers, 'Chrome/%d.', f'Chrome/{random.randint(60,90)}.')
 
 def check_for_errors(request):
     def inner_func(cls, method, url, **kwargs):
@@ -46,7 +58,8 @@ def check_for_errors(request):
                             f'{str(datetime.today())} [crit] Server URL: {response.url}, ' \
                             f'failed with status code ({response.status_code}). ' \
                             f'Errors: {errors}. ' \
-                            f'Raw response: {raw_response}'
+                            f'Raw response: {raw_response}' \
+                            f'Request payload: {kwargs["data"]}'
             log_error(error_message)
             raise
         return response
@@ -69,6 +82,10 @@ class BaseClient:
     def __init__(self):
         self.url = None
         self.session = Session()
+        self.headers = Headers()
+
+        settings.headers.update(self.headers.generate())
+
         self.session.headers.update(settings.headers)
         self._initial_logging()
 
@@ -91,7 +108,13 @@ class BaseClient:
         Use Tor to fake our IP address. Note that couldfare is going to be a
         PITA so this method is pretty useless as it is.
         """
-        renew_connection()
+        try:
+            renew_connection()
+        except stem.SocketError:
+            log_error(
+                f'{str(datetime.today())} [crit] Socket Error: '\
+                'The Tor service is not up. Unable to continue.'
+            )
         self.session = get_tor_session(self.session)
 
     def login(self, credentials: dict):
@@ -119,6 +142,10 @@ class AIDScrapper(BaseClient):
 
         # Get all settings
         self.stories_query = settings.stories_query
+        self.create_scen_payload = settings.create_scen_payload
+        self.update_scen_payload = settings.update_scen_payload
+        self.make_WI_payload = settings.make_WI_payload
+        self.update_WI_payload = settings.update_WI_payload
         self.scenarios_query = settings.scenarios_query
         self.subscen_query = settings.subscen_query
         self.aid_loginpayload = settings.aid_loginpayload
@@ -156,7 +183,14 @@ class AIDScrapper(BaseClient):
             )
         ).json()['data']
 
-    def get_stories(self):
+    def retrieve_data(self):
+        for scenario, story in (self.my_scenarios, self.my_stories):
+            self.prompts.add(scenario)
+            self.adventures.add(story)
+
+    @property
+    def my_stories(self) -> List[Dict]:
+        stories: List[Dict] = []
         while True:
             self.stories_query['variables']['input']['searchTerm'] = self.adventures.title
             log('Getting a page of stories...')
@@ -164,71 +198,71 @@ class AIDScrapper(BaseClient):
             result = self._get_object(self.stories_query)['user']['search']
 
             if result:
-                for story in result:
-                    try:
-                        self.adventures.add(story)
-                    except ValidationError:
-                        self.discarded_stories += 1
-                    log(f'Got {len(self.adventures)} stories so far')
+                stories.extend(result)
+                log(f'Got {len(stories)} stories so far')
                 self.stories_query['variables']['input']['offset'] = len(
-                                                                         self.adventures
-                                                                     ) + self.discarded_stories
+                                                                         stories
+                                                                     )
             else:
                 log('Looks like there\'s no more.')
-                # return discarded stories to 0, since we are done
-                self.discarded_stories = 0
                 break
+        return stories
 
-    def get_scenarios(self):
+    @property
+    def my_scenarios(self) -> List[Dict]:
+        scenarios: List[Dict] = []
         while True:
             self.scenarios_query['variables']['input']['searchTerm'] = self.prompts.title
             log('Getting a page of scenarios...')
 
             result = self._get_object(self.scenarios_query)['user']['search']
 
-            if len(result):
+            if result:
                 for scenario in result:
-                    try:
-                        self.prompts.add(scenario)
-                    except ValidationError:
-                        self.discarded_stories += 1
                     if isinstance(scenario['options'], Sequence):
-                        for option in scenario['options']:
-                            self.get_subscenario(option['publicId'])
-                            # don not count suscens
-                            self.discarded_stories -= 1
-                    log('Got {len(self.prompts)} scenarios so far')
+                        scenarios += [
+                            self.get_subscenarios(
+                                option['publicId']
+                            ) for option in scenario['options']
+                        ]
+                    scenarios.append(scenario)
+
+                log(f'Got {len(scenarios)} scenarios so far')
                 self.scenarios_query['variables'] \
                                     ['input'] \
                                     ['offset'] = len(
-                                                     self.prompts
+                                                     scenarios
                                                  ) + self.discarded_stories
             else:
                 log('Looks like there\'s no more.')
                 self.discarded_stories = 0
                 break
+        return scenarios
 
-    def get_subscenario(self, pubid):
-        log(f'Getting subscenario {pubid}...')
-
+    def get_subscenarios(self, pubid) -> Dict:
         self.subscen_query['variables']['publicId'] = pubid
 
-        result = self._get_object(self.subscen_query)['scenario']
+        subscen = self.session.post(
+                self.url,
+                data=json.dumps(self.subscen_query)
+        ).json()['data']['scenario']
+        subscen['isOption'] = True
 
-        result['isOption'] = True
-        try:
-            self.prompts.add(result)
-        except ValidationError:
-            # With subscens there is no problem with offset
-            pass
-        if isinstance(result['options'], Sequence):
-            for option in result['options']:
-                self.get_subscenario(option['publicId'])
-                self.discarded_stories -= 1
+        if isinstance(subscen['options'], Sequence):
+            subscens = [
+                self.get_subscenarios(
+                    option['publicId']
+                ) for option in subscen['options']
+            ]
+        subscens.insert(0, subscen)
+        # do not count subscens for the offset
+        self.discarded_stories -= len(subscens)
+
+        return subscens
 
     def get_login_token(self, credentials: dict):
         self.aid_loginpayload['variables']['identifier'] = \
-            self.aid_loginpayload['variables']['email'] = credentials['user']
+            self.aid_loginpayload['variables']['email'] = credentials['username']
         self.aid_loginpayload['variables']['password'] = credentials['password']
         res = self.session.post(
             self.url,
@@ -241,20 +275,19 @@ class AIDScrapper(BaseClient):
         log('no data?!')
         return None
 
-    def upload_in_bulk(self, stories):
-        #(XXX)
-        # Mental note: Find where I put the payload.
-        for scenario in stories['scenarios']:
-            self.session.post(self.url,
-                data=json.dumps(
-                    self.create_scen_payload
-                 )
-            )
+    def upload_in_bulk(self, scenarios):
+        for scenario in scenarios:
+            res = self.session.post(self.url,
+                data=json.dumps(self.create_scen_payload)
+            ).json()['data']['createScenario']
+            scenario.update({'publicId': res['publicId']})
+            new_scenario = self.update_scen_payload.copy()
+
+            clean_scenario = {k: v for k, v in scenario.items() if k in new_scenario['variables']['input']}
+            new_scenario.update({'variables': {'input': clean_scenario}})
             self.session.post(
                 self.url,
-                data=json.dumps(
-                    self.update_scen_payload
-                )
+                data=json.dumps(new_scenario)
             )
             log(f'{scenario["title"]} successfully uploaded...')
 
@@ -265,6 +298,9 @@ class ClubClient(BaseClient):
         super().__init__()
 
         self.url = 'https://prompts.aidg.club/'
+
+        if not bs4:
+            raise ImportError('You must pip install bs4 to use the club client.')
 
     def _post(self, obj_url, params):
         url = self.url + obj_url
@@ -292,12 +328,13 @@ class ClubClient(BaseClient):
         credentials = credentials or {}
 
         params = {
-                 'ReturnUrl': '',
+                 'ReturnUrl': '/',
                  'Honey': '',
                  'Username': '',
                  'Password': '',
                  'PasswordConfirm': ''
-        }.update(credentials)
+        }
+        params.update(credentials)
         if not credentials:
             params.update(
                 {
@@ -315,10 +352,11 @@ class ClubClient(BaseClient):
 
         params = {
                  'ReturnUrl': '',
-                 'Honey': '',
+                 'Honey': None,
                  'Username': '',
                  'Password': ''
-        }.update(credentials)
+        }
+        params.update(credentials)
         if not credentials:
             params.update(
                 {
@@ -329,7 +367,7 @@ class ClubClient(BaseClient):
 
         self._post('user/login/', params)
 
-    def publish(self, title=''):
+    def publish_scenario(self, title: str = ''):
         """
         Publish a scenario with a given name to the club.
         """

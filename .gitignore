@@ -4,9 +4,11 @@ stories/
 scenarios/
 *.json
 index.html
-token
 *.scenario
 
+# Test files
+!test_scen.json
+!test_stories.json
 
 # python cache
 __pycache__/

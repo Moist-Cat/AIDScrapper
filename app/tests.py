@@ -95,8 +95,8 @@ class TestDowloadFiles(unittest.TestCase):
         self.client.logout()
 
     def test_download(self):
-        self.client.get_scenarios('Mormonism')
-        self.client.get_stories('Mormonism')
+        self.client.my_scenarios('Mormonism')
+        self.client.my_stories('Mormonism')
 
 class TestHtmlFiles(unittest.TestCase):
 
