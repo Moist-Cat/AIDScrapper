@@ -1,3 +1,4 @@
+import _thread
 import json
 import getpass
 from typing import Sequence, List, Dict
@@ -215,16 +216,16 @@ class AIDScrapper(BaseClient):
             self.scenarios_query['variables']['input']['searchTerm'] = self.prompts.title
             log('Getting a page of scenarios...')
 
-            result = self._get_object(self.scenarios_query)['user']['search']
+            result: List[Dict] = self._get_object(self.scenarios_query)['user']['search']
 
             if result:
                 for scenario in result:
                     if isinstance(scenario['options'], Sequence):
-                        scenarios += [
+                        scenarios.extend([
                             self.get_subscenarios(
                                 option['publicId']
                             ) for option in scenario['options']
-                        ]
+                        ])
                     scenarios.append(scenario)
 
                 log(f'Got {len(scenarios)} scenarios so far')
@@ -237,9 +238,9 @@ class AIDScrapper(BaseClient):
                 log('Looks like there\'s no more.')
                 self.discarded_stories = 0
                 break
-        return scenarios
+            return scenarios
 
-    def get_subscenarios(self, pubid) -> Dict:
+    def get_subscenarios(self, pubid) -> List[Dict]:
         self.subscen_query['variables']['publicId'] = pubid
 
         subscen = self.session.post(
@@ -254,7 +255,7 @@ class AIDScrapper(BaseClient):
                     option['publicId']
                 ) for option in subscen['options']
             ]
-        subscens.insert(0, subscen)
+        subscens.extend(subscen)
         # do not count subscens for the offset
         self.discarded_stories -= len(subscens)
 

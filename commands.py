@@ -5,6 +5,7 @@ import os
 from aids.app.client import AIDScrapper, ClubClient, HoloClient, bs4
 import aids.to_html as to_html
 from aids.app.settings import BASE_DIR
+from aids.app.models import NAIScenario
 
 # notice that these are sets inside a dict
 command_arg_dict = {
@@ -104,6 +105,37 @@ def _reformat_context(json_data):
             print('Well, shit. You will have to ' \
                  'change those manually.')
 
+def makejson():
+    data = _json_to_scenario()
+    data.dump()
+
+def _json_to_scenario() -> 'NAIScenario':
+    model = NAIScenario()
+
+    data_scheme = model.data.copy()
+    memory_scheme = data_scheme['context'][0].copy()
+    an_scheme = data_scheme['context'][1].copy()
+    wi_entries_scheme = data_scheme['lorebook']['entries'][0].copy()
+
+    with open('scenario.json') as file:
+        json_data = json.load(file)
+    
+    for scenario in json_data:
+        data_scheme.update(scenario)
+        if 'worldInfo' in scenario and scenario['worldInfo']:
+            for wi in scenario['worldInfo']:
+                wi_entries_scheme.update({'text': wi['entry']})
+                wi_entries_scheme.update({'keys': wi['keys']})
+                data_scheme['lorebook']['entries'].append(wi_entries_scheme)
+
+        an_scheme.update({'text': scenario['authorsNote']})
+        memory_scheme.update({'text': scenario['memory']})
+        data_scheme.update({'context':[memory_scheme.copy(), an_scheme.copy()]})
+
+        model.add(data_scheme)
+
+    return model
+
 def _scenario_to_json():
     nai_file_name = glob.glob('*.scenario')
     scenario = []
@@ -139,7 +171,7 @@ def _scenario_to_json():
         json.dump(scenario, file)
 
 def test():
-    os.system('python -m unittest -v app.tests')
+    os.system('python -m unittest -v aids.app.tests')
 
 def help():
     with open(BASE_DIR / 'help.txt') as file:

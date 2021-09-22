@@ -56,10 +56,11 @@ def get_command(argv: List[str] = sys.argv[1:]):
     else:
         try:
             main_command = getattr(commands, cmd.command)
-            # to the date, all other commands do not require args
-            main_command()
         except AttributeError:
             print(f'{cmd.command} is not a valid command')
+        else:
+            # to the date, all other commands do not require args
+            main_command()
 
 if __name__ == '__main__':
     get_command()

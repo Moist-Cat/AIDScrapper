@@ -26,12 +26,12 @@ class TestModel(unittest.TestCase):
 
     def test_story_validation(self):
         for story in self.stor_in:
-            self.stories.add(story)
+            self.stories._add(story)
             self.assertEqual(story['actions'], self.stories.out[-1]['actions'])
 
     def test_scenario_validation(self):
         for scenario in self.scen_in:
-            self.scenarios.add(scenario)
+            self.scenarios._add(scenario)
             self.assertEqual(scenario['prompt'], self.scenarios.out[-1]['prompt'])
 
     def test_invalid_title_raises(self):
@@ -41,12 +41,12 @@ class TestModel(unittest.TestCase):
         self.stories.title = 'sneed'
         self.assertRaises(
             ValidationError,
-            self.stories.add,
+            self.stories._add,
             bad_title
         )
 
         bad_title['title'] = 'sneed'
-        self.stories.add(bad_title)
+        self.stories._add(bad_title)
 
     def test_invalid_actions_raises(self):
         too_few_actions = self.stor_in[0]
@@ -55,39 +55,42 @@ class TestModel(unittest.TestCase):
 
         self.assertRaises(
             ValidationError,
-            self.stories.add,
+            self.stories._add,
             too_few_actions
         )
 
         too_few_actions['actions'].append(11)
-        self.stories.add(too_few_actions)
+        self.stories._add(too_few_actions)
 
     def duplicate_scenario_raises(self):
         duplicate_scenario = self.scen_in[0]
 
-        self.scenarios.add(duplicate_scenario)
+        self.scenarios._add(duplicate_scenario)
 
         self.assertRaises(
             ValidationError,
-            self.stories.add,
+            self.stories._add,
             duplicate_scenario
         )
 
     def duplicate_story_raises(self):
         duplicate_story = self.stor_in[0]
 
-        self.stories.add(duplicate_story)
+        self.stories._add(duplicate_story)
 
         self.assertRaises(
             ValidationError,
-            self.stories.add,
+            self.stories._add,
             duplicate_story
         )
+
 @skip
 class TestDowloadFiles(unittest.TestCase):
 
     def setUp(self):
         self.client = AIDScrapper()
+        self.client.prompts.title = 'Test'
+        self.client.adventures.title = 'Test'
         # you better have configured your secrets.json file.
         self.client.login()
 
@@ -95,8 +98,8 @@ class TestDowloadFiles(unittest.TestCase):
         self.client.logout()
 
     def test_download(self):
-        self.client.my_scenarios('Mormonism')
-        self.client.my_stories('Mormonism')
+        assert self.client.my_scenarios
+        assert self.client.my_stories
 
 class TestHtmlFiles(unittest.TestCase):
 
