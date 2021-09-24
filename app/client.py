@@ -1,9 +1,8 @@
-import _thread
+from weakref import ref
 import json
 import getpass
 from typing import Sequence, List, Dict
 import time
-from datetime import datetime
 import traceback
 import random
 import re
@@ -12,12 +11,15 @@ try:
     import bs4
 except ImportError:
     bs4 = None
-import stem
+try:
+    import stem
+    from aids.app.obfuscate import get_tor_session, renew_connection
+except:
+    stem = None
 
 from aids.app.models import Story, Scenario
-from aids.app.obfuscate import get_tor_session, renew_connection
 from aids.app.writelogs import log_error, log
-from aids.app import settings, writelogs
+from aids.app import settings, writelogs, schemes
 
 # this import must go after settings bacause we might need them
 # to use our "fake-headers"
@@ -28,41 +30,55 @@ except ImportError:
         def generate(self):
             return re.sub(settings.headers, 'Chrome/%d.', f'Chrome/{random.randint(60,90)}.')
 
-def check_for_errors(request):
+def check_errors(request):
     def inner_func(cls, method, url, **kwargs):
-        connection_success = False
-        while not connection_success:
+        request_success = False
+        while not request_success:
             try:
+                start = time.time()
+                log('debug', f'Trying to {method} data from {url}...')
                 response = request(cls, method, url, **kwargs)
-            except requests.exceptions.ConnectionError:
-                error_message = '-------------------ERROR-------------------------\n' \
-                                f'{str(datetime.today())} [fatal] Server URL: {url}), ' \
-                                f'failed while trying to connect.'
+                time_elapsed = time.time() - start
+                log(
+                    'debug',
+                    f'The response from the server after {time_elapsed:.2f} seconds '\
+                    f'was {len(response.text)} characters big. URL: {response.url}'
+                )
+                response.raise_for_status()
+            except (
+                    requests.exceptions.ConnectionError, requests.exceptions.SSLError
+            ):
                 with open(writelogs.ERROR_FILE, 'a') as error:
                     traceback.print_exc(file=error)
 
-                log('Something went wrong. Retrying...')
-                log_error(error_message)
-
-                time.sleep(3)
+                log('log', 'Something went wrong. Retrying...')
+                log_error(
+                    'fatal',
+                    f'Server URL: {url}), failed while trying to connect.'
+                )
+            except requests.exceptions.HTTPError:
+                try:
+                    errors = response.json()['errors']
+                except json.decoder.JSONDecodeError:
+                    errors = 'No errors'
+                raw_response = response.content[:20] if len(response.content) > 50 else response.content
+                try:
+                    payload = kwargs['data']
+                except KeyError:
+                    payload = 'none'
+                error_message = (
+                    'crit',
+                    f'Server URL: {response.url}, ' \
+                    f'failed with status code ({response.status_code}). ' \
+                    f'Errors: {errors}. ' \
+                    f'Raw response: {raw_response}' \
+                    f'Request payload: {payload}'
+                )
+                log_error(*error_message)
+                raise
             else:
-                connection_success = True
-        try:
-            response.raise_for_status()
-        except requests.exceptions.HTTPError:
-            try:
-                errors = response.json()['errors']
-            except json.decoder.JSONDecodeError:
-                errors = 'No errors'
-            raw_response = response.content[:20] if len(response.content) > 50 else response.content
-            error_message = '-------------------ERROR-------------------------\n' \
-                            f'{str(datetime.today())} [crit] Server URL: {response.url}, ' \
-                            f'failed with status code ({response.status_code}). ' \
-                            f'Errors: {errors}. ' \
-                            f'Raw response: {raw_response}' \
-                            f'Request payload: {kwargs["data"]}'
-            log_error(error_message)
-            raise
+                request_success = True
+            time.sleep(3)
         return response
     return inner_func
 
@@ -72,7 +88,7 @@ class Session(requests.Session):
     after completing the request.
     """
 
-    @check_for_errors
+    @check_errors
     def request(self, method, url, **kwargs):
         return super().request(method, url, **kwargs)
 
@@ -82,21 +98,19 @@ class BaseClient:
     """
     def __init__(self):
         self.url = None
-        self.session = Session()
-        self.headers = Headers()
+        self.session = ref(Session())
+        self.headers = ref(Headers())
 
         settings.headers.update(self.headers.generate())
 
         self.session.headers.update(settings.headers)
         self._initial_logging()
 
-    def __delete__(self, instance):
+    def __del__(self):
         self.session.close()
 
     def _initial_logging(self):
-        message = '--------------------INIT-----------------------\n' \
-                  f'{str(datetime.today())}: {self.__class__.__name__} successfully initialized.'
-        log(message)
+        log('init', f'{self.__class__.__name__} successfully initialized.')
 
     def quit(self):
         """
@@ -109,11 +123,12 @@ class BaseClient:
         Use Tor to fake our IP address. Note that couldfare is going to be a
         PITA so this method is pretty useless as it is.
         """
+        if not stem:
+            raise ImportError('You need the stem library to use this method')
         try:
             renew_connection()
         except stem.SocketError:
-            log_error(
-                f'{str(datetime.today())} [crit] Socket Error: '\
+            log_error('crit', 'Socket Error: '\
                 'The Tor service is not up. Unable to continue.'
             )
         self.session = get_tor_session(self.session)
@@ -131,28 +146,29 @@ class BaseClient:
         """
         self.session.headers = settings.headers
         self.session.cookies.clear()
+        log('log', 'logged out')
 
 class AIDScrapper(BaseClient):
     """
     AID Client to make API calls via requests.
     """
+    adventures = ref(Story())
+    prompts = ref(Scenario())
+
     def __init__(self):
         super().__init__()
 
         self.url = 'https://api.aidungeon.io/graphql'
 
         # Get all settings
-        self.stories_query = settings.stories_query
-        self.create_scen_payload = settings.create_scen_payload
-        self.update_scen_payload = settings.update_scen_payload
-        self.make_WI_payload = settings.make_WI_payload
-        self.update_WI_payload = settings.update_WI_payload
-        self.scenarios_query = settings.scenarios_query
-        self.subscen_query = settings.subscen_query
-        self.aid_loginpayload = settings.aid_loginpayload
-
-        self.adventures = Story()
-        self.prompts = Scenario()
+        self.stories_query = schemes.stories_query
+        self.create_scen_payload = schemes.create_scen_payload
+        self.update_scen_payload = schemes.update_scen_payload
+        self.make_WI_payload = schemes.make_WI_payload
+        self.update_WI_payload = schemes.update_WI_payload
+        self.scenarios_query = schemes.scenarios_query
+        self.subscen_query = schemes.subscen_query
+        self.aid_loginpayload = schemes.aid_loginpayload
 
         self.discarded_stories = 0
 
@@ -173,6 +189,7 @@ class AIDScrapper(BaseClient):
         key = self.get_login_token(credentials)
 
         self.session.headers.update({'x-access-token': key})
+        log('log', 'logged in AID')
 
     def _get_object(self, query: dict):
         query['variables']['input']['searchTerm'] = self.adventures.title
@@ -194,18 +211,17 @@ class AIDScrapper(BaseClient):
         stories: List[Dict] = []
         while True:
             self.stories_query['variables']['input']['searchTerm'] = self.adventures.title
-            log('Getting a page of stories...')
 
             result = self._get_object(self.stories_query)['user']['search']
 
             if result:
                 stories.extend(result)
-                log(f'Got {len(stories)} stories so far')
+                log('debug', f'Got {len(stories)} stories so far')
                 self.stories_query['variables']['input']['offset'] = len(
                                                                          stories
                                                                      )
             else:
-                log('Looks like there\'s no more.')
+                log('log', 'All stories downloaded')
                 break
         return stories
 
@@ -214,7 +230,6 @@ class AIDScrapper(BaseClient):
         scenarios: List[Dict] = []
         while True:
             self.scenarios_query['variables']['input']['searchTerm'] = self.prompts.title
-            log('Getting a page of scenarios...')
 
             result: List[Dict] = self._get_object(self.scenarios_query)['user']['search']
 
@@ -228,14 +243,14 @@ class AIDScrapper(BaseClient):
                         ])
                     scenarios.append(scenario)
 
-                log(f'Got {len(scenarios)} scenarios so far')
+                log('debug', f'Got {len(scenarios)} scenarios so far')
                 self.scenarios_query['variables'] \
                                     ['input'] \
                                     ['offset'] = len(
                                                      scenarios
                                                  ) + self.discarded_stories
             else:
-                log('Looks like there\'s no more.')
+                log('log', 'All scenarios downloaded')
                 self.discarded_stories = 0
                 break
             return scenarios
@@ -273,7 +288,7 @@ class AIDScrapper(BaseClient):
         ).json()
         if 'data' in res:
             return res['data']['login']['accessToken']
-        log('no data?!')
+        log_error('crit', 'There was no data')
         return None
 
     def upload_in_bulk(self, scenarios):
@@ -290,7 +305,7 @@ class AIDScrapper(BaseClient):
                 self.url,
                 data=json.dumps(new_scenario)
             )
-            log(f'{scenario["title"]} successfully uploaded...')
+            log('log', f'{scenario["title"]} successfully uploaded...')
 
 
 class ClubClient(BaseClient):
@@ -429,7 +444,7 @@ class HoloClient(BaseClient):
         self.url = self.base_url + 'api/'
 
         # Get all settings
-        self.generate_holo = settings.generate_holo
+        self.generate_holo = schemes.generate_holo
 
         self.curr_story_id = ''
 

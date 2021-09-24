@@ -1,3 +1,5 @@
+import os
+import glob
 import json
 import unittest
 from unittest import skip
@@ -7,6 +9,8 @@ from bs4 import BeautifulSoup as bs
 from aids.app.settings import BASE_DIR
 from aids.app.client import AIDScrapper
 from aids.app.models import Story, Scenario, ValidationError
+from aids.app.schemes import FrozenKeyDict
+from aids.commands import makejson, makenai, all_to_html
 
 TEST_DIR = BASE_DIR / 'app/test_files'
 
@@ -27,24 +31,30 @@ class TestModel(unittest.TestCase):
     def test_story_validation(self):
         for story in self.stor_in:
             self.stories._add(story)
-            self.assertEqual(story['actions'], self.stories.out[-1]['actions'])
+            self.assertEqual(
+                story['actions'],
+                self.stories[story['title'], len(story['actions'])]['actions']
+            )
 
     def test_scenario_validation(self):
         for scenario in self.scen_in:
             self.scenarios._add(scenario)
-            self.assertEqual(scenario['prompt'], self.scenarios.out[-1]['prompt'])
+            self.assertEqual(
+                scenario['prompt'],
+                self.scenarios[scenario['title']]['prompt']
+            )
 
     def test_invalid_title_raises(self):
         bad_title = self.stor_in[0]
-
+        self.stories('sneed', 1)
+        
         bad_title['title'] = 'not_sneed'
-        self.stories.title = 'sneed'
         self.assertRaises(
             ValidationError,
             self.stories._add,
             bad_title
         )
-
+        
         bad_title['title'] = 'sneed'
         self.stories._add(bad_title)
 
@@ -84,13 +94,97 @@ class TestModel(unittest.TestCase):
             duplicate_story
         )
 
+
+class TestDataStructures(unittest.TestCase):
+
+    def setUp(self):
+        self.d = FrozenKeyDict([(1,2), (3,4)])
+    
+    def tearDown(self):
+        del self.d
+
+    def test_frozen_dict(self):
+        self.d[4] = 4
+
+        self.assertNotIn(4, self.d.keys())
+
+        self.d[1] = 3
+
+        self.assertEqual(3, self.d[1])
+
+        self.d.update({7:3})
+
+        self.assertNotIn(7, self.d.keys())
+
+class TestReformatters(unittest.TestCase):
+
+    def setUp(self):
+        self.scenario_infile = TEST_DIR / 'The_Layover.scenario'
+        self.json_outfile = TEST_DIR / 'test_Lay.json'
+        
+        self.json_infile = TEST_DIR / 'test_scen.json'
+        self.scenario_outfile = TEST_DIR / 'test_naiscen.json'
+    
+    def tearDown(self):
+        nai_file_names = glob.glob(str(TEST_DIR / '*.scenario'))
+        for file_path in nai_file_names:
+            if str(file_path) != str(self.scenario_infile):
+                os.remove(file_path)
+        try:
+            os.remove(self.json_outfile)
+        except FileNotFoundError:
+            pass
+        try:
+            os.remove(self.scenario_outfile)
+        except FileNotFoundError:
+            pass
+
+    def test_makejson(self):
+        makejson(self.scenario_infile, self.json_outfile)
+
+        with open(self.scenario_infile) as scen:
+            in_f = json.load(scen)
+
+        with open(self.json_outfile) as scen:
+            out_f = json.load(scen)
+
+        map(
+            self.assertIn, (
+                in_f['title'],
+                in_f['prompt'],
+                in_f['context'][0]['text']
+            ), out_f[0].values()
+        )
+
+    def test_makenai(self):
+        makenai(self.json_infile, self.scenario_outfile, single_files=False)
+        
+        with open(self.json_infile) as scen:
+            in_f = json.load(scen)
+
+        with open(self.scenario_outfile) as scen:
+            for s in json.load(scen):
+                if s['title'] == 'Snowed In':
+                   out_f = s
+        map(
+            self.assertIn, (
+                in_f[0]['title'],
+                in_f[0]['prompt'],
+                in_f[0]['memory']
+            ), out_f.values()
+        )
+        
+        makenai(self.json_infile, TEST_DIR)
+        
+        assert len(glob.glob(str(TEST_DIR / '*.scenario'))) > 60
+
 @skip
 class TestDowloadFiles(unittest.TestCase):
 
     def setUp(self):
         self.client = AIDScrapper()
-        self.client.prompts.title = 'Test'
-        self.client.adventures.title = 'Test'
+        self.client.prompts('Test')
+        self.client.adventures.title('Test', 0)
         # you better have configured your secrets.json file.
         self.client.login()
 
@@ -109,8 +203,16 @@ class TestHtmlFiles(unittest.TestCase):
         with open(TEST_DIR / 'test_scen.json') as file:
             self.scen_in = json.load(file)
 
+        all_to_html(
+            TEST_DIR,
+            'test_stories.json',
+            'test_scen.json'
+        )
+
     def tearDown(self):
-        pass
+        html_indexes = glob.glob(str(TEST_DIR / '**/*.html'), recursive=True)
+        for file in html_indexes:
+            os.remove(file)
 
     def assert_if_exists(self, body, element):
         # \"formatting\" is not compatible with the regex
@@ -165,6 +267,7 @@ class TestHtmlFiles(unittest.TestCase):
 
         # all the actions were in a span, we get them all
         html_actions = html.findAll('span')
+        assert html_actions
         matches = 0
         # Checking every action against ALL the other actions, to see if they
         # match since  they are not organized.
@@ -173,14 +276,12 @@ class TestHtmlFiles(unittest.TestCase):
                 # One would argue that this could cause a false red flag 
                 # but no one can do multiple actions in the same second (for now)
                 # so it is fine.
-                if h_action.attrs['title'] == s_action['createdAt']:
-                    self.assertEqual(h_action.text.replace('\n', ''),
-                                    s_action['text'].replace('\n', ''))
+                if h_action.attrs['date'] == s_action['createdAt']:
+                    self.assertEqual(h_action.text.strip().replace('\n', ''),
+                                    s_action['text'].strip().replace('\n', ''))
                     matches += 1
 
-        # Discarded actions are counted, but we only care about 
-        # the regular ones, so as long as every regular action is there...
-        self.assertEqual(len(story['actions']), matches)
+        self.assertEqual(matches, len(story['actions']))
 
         for wi in story['worldInfo']:
             self.assert_if_exists(body, wi['keys'])

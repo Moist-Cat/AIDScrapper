@@ -32,12 +32,6 @@
 		<hr>
 	{% endfor %}
 	</details>
-		{% for action in story["actions"] %}
-			<span data-type="{{ action["type"] }}" date="{{ action["createdAt"] }}">
-			    {{ action["text"] }}
-			</span>
-		{% endfor %}
-
 	{% if "worldInfo" in story and story["worldInfo"] %}
 		<details><summary>World info</summary>
 		{% for wi in story["worldInfo"] %}

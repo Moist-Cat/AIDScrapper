@@ -5,6 +5,7 @@ scenarios/
 *.json
 index.html
 *.scenario
+!The_Layover.scenario
 
 # python cache
 __pycache__/

@@ -1,4 +1,4 @@
-# AIDScrapper
+AIDScrapper
 
 Tweaked version of ScriptAnon stuff getter.
 
