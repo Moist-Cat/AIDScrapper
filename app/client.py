@@ -1,4 +1,3 @@
-from weakref import ref
 import json
 import getpass
 from typing import Sequence, List, Dict
@@ -98,8 +97,8 @@ class BaseClient:
     """
     def __init__(self):
         self.url = None
-        self.session = ref(Session())
-        self.headers = ref(Headers())
+        self.session = Session()
+        self.headers = Headers()
 
         settings.headers.update(self.headers.generate())
 
@@ -152,8 +151,8 @@ class AIDScrapper(BaseClient):
     """
     AID Client to make API calls via requests.
     """
-    adventures = ref(Story())
-    prompts = ref(Scenario())
+    adventures = Story()
+    prompts = Scenario()
 
     def __init__(self):
         super().__init__()

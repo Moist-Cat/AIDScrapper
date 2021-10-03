@@ -30,7 +30,7 @@ class TestModel(unittest.TestCase):
 
     def test_story_validation(self):
         for story in self.stor_in:
-            self.stories._add(story)
+            self.stories.add(story)
             self.assertEqual(
                 story['actions'],
                 self.stories[story['title'], len(story['actions'])]['actions']
@@ -38,7 +38,7 @@ class TestModel(unittest.TestCase):
 
     def test_scenario_validation(self):
         for scenario in self.scen_in:
-            self.scenarios._add(scenario)
+            self.scenarios.add(scenario)
             self.assertEqual(
                 scenario['prompt'],
                 self.scenarios[scenario['title']]['prompt']
@@ -51,12 +51,12 @@ class TestModel(unittest.TestCase):
         bad_title['title'] = 'not_sneed'
         self.assertRaises(
             ValidationError,
-            self.stories._add,
-            bad_title
+            self.stories.update,
+            {'sneed': bad_title}
         )
         
-        bad_title['title'] = 'sneed'
-        self.stories._add(bad_title)
+        bad_title.update({'title':'sneed'})
+        self.stories.update({'sneed': bad_title})
 
     def test_invalid_actions_raises(self):
         too_few_actions = self.stor_in[0]
@@ -65,33 +65,33 @@ class TestModel(unittest.TestCase):
 
         self.assertRaises(
             ValidationError,
-            self.stories._add,
-            too_few_actions
+            self.stories.update,
+            {'sneed': too_few_actions}
         )
 
         too_few_actions['actions'].append(11)
-        self.stories._add(too_few_actions)
+        self.stories.update({'sneed': too_few_actions})
 
-    def duplicate_scenario_raises(self):
+    def test_duplicate_scenario_raises(self):
         duplicate_scenario = self.scen_in[0]
 
-        self.scenarios._add(duplicate_scenario)
+        self.scenarios.add(duplicate_scenario)
 
         self.assertRaises(
             ValidationError,
-            self.stories._add,
-            duplicate_scenario
+            self.stories.update,
+            {'sneed': duplicate_scenario}
         )
 
     def duplicate_story_raises(self):
         duplicate_story = self.stor_in[0]
 
-        self.stories._add(duplicate_story)
+        self.stories['sneed'] = duplicate_story
 
         self.assertRaises(
             ValidationError,
-            self.stories._add,
-            duplicate_story
+            self.stories.update,
+            {'sneed': duplicate_story}
         )
 
 
@@ -166,13 +166,21 @@ class TestReformatters(unittest.TestCase):
             for s in json.load(scen):
                 if s['title'] == 'Snowed In':
                    out_f = s
-        map(
-            self.assertIn, (
-                in_f[0]['title'],
-                in_f[0]['prompt'],
-                in_f[0]['memory']
-            ), out_f.values()
-        )
+
+        try:
+            map(
+                self.assertIn, (
+                    in_f[0]['title'],
+                    in_f[0]['prompt'],
+                    in_f[0]['memory']
+                ), out_f.values()
+            )
+        except UnboundLocalError:
+            raise AssertionError(
+                'The scenario was not in the file. Possibly because the same reference' \
+                'for an object was used and, when changed, updated all other objects. Use .copy()' \
+                'to avoid this.'
+            )
         
         makenai(self.json_infile, TEST_DIR)
         

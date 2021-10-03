@@ -36,9 +36,7 @@ def get_command(argv: List[str] = sys.argv[1:]):
         try:
             required_args = [
                 args[arg]
-                for arg in command_arg_dict[cmd.platform][cmd.command].intersection(
-                                                                           set(args.keys())
-                                                                       )
+                for arg in command_arg_dict[cmd.platform][cmd.command] if arg in tuple(args.keys())
             ]
         except KeyError:
             print('Unrecognized command')

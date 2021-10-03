@@ -16,7 +16,6 @@ BASE_DIR = settings.BASE_DIR
 class ValidationError(Exception):
     pass
 
-
 class FieldValueIs:
     def __init__(self, field, value):
         self.field = field
@@ -56,7 +55,9 @@ class FieldNotBlank:
 
 class AIDSObject(ABC, dict):
     """Base aids object Container class from where all other containers
-    must inherit
+    must inherit. It ineriths from the dict builtin object so it behaves pretty much
+    like one - except with the fact that data should be passed to the add method for
+    validation.
     """
 
     data: Dict
@@ -85,23 +86,33 @@ class AIDSObject(ABC, dict):
         return super().__getitem__(key)
 
     def __setitem__(self, key, value):
-        super().__setitem__(key, value)
+        self.data.update(value)
+        try:
+            for validator in self._validators:
+                validator.validate(self.data)
+        except ValidationError:
+            raise
+        else:
+            self.clean_titles(self.data)
+            super().__setitem__(key, self.data.copy())
 
     def __delitem__(self, key):
         super().__delitem__(key)
-
-    @abstractmethod
-    def validate(self, value):
-        pass
+    
+    def update(self, other=(), /, **kwds):
+        """For some reason, the builtin dict.update method
+        does not use __setattr__ therefore we must use MutableMapping.update
+        """
+        MutableMapping.update(self, other, **kwds)
 
     # --- core ---
     @abstractmethod
-    def _add(self, value: dict):
-        raise ValidationError
-
     def add(self, value: dict):
+        """This handles the exception that __setitem__ could raise.
+        """
+        key = value['uuid']
         try:
-            self._add(value)
+            self.__setitem__(key, value)
         except ValidationError:
             pass
 
@@ -144,14 +155,22 @@ class AIDSObject(ABC, dict):
             )
         log("log", "{len(self)} objects loaded from the {file}")
 
+    @abstractmethod
+    def _validators(self) -> List[Any]:
+        """To properly initialize validators when they are needed - not before.
+        This is the class you must override if you want to add more validators."""
+        self.validators: List[Any] = []
+        return self.validators
+
     @staticmethod
     def clean_titles(data: dict):
         """Substitute dangerous characters from the data \"title\" key and
         its options if present.
         """
+        assert "title" in data
         try:
             data["title"] = data["title"].replace("/", "-").replace("\\", "-")
-        except (KeyError, AttributeError):
+        except (KeyError):
             data["title"] = "Untitled"
         if "options" in data:
             data["options"] = [
@@ -163,6 +182,8 @@ class AIDSObject(ABC, dict):
         return data
 
 class BaseScenario(AIDSObject):
+    """Base Scenario object.
+    """
 
     def __init__(self, title: str = ""):
         super().__init__()
@@ -172,26 +193,28 @@ class BaseScenario(AIDSObject):
     def __call__(self, title):
         self.title = title
 
-    def _add(self, value: dict):
-        self.data.update(value)
-        data = self.data.copy()
+    def add(self, value: dict):
+        """This handles the exception that __setitem__ could raise.
+        """
+        key = value['title']
         try:
-            self.validate(value)
-        except ValidationError as e:
-            raise
-        else:
-            self.clean_titles(data)
-            self.update({value['title']: data})
+            self.__setitem__(key, value)
+        except ValidationError:
+            pass
 
-    def validate(self, value):
-        validators = [
+    @property
+    def _validators(self):
+        self.validators = [
             FieldValueIs('title', self.title),
             FieldNotBlank(('title', 'prompt'))
         ]
-        for validator in validators:
-            validator.validate(value)
+        return self.validators
 
 class BaseStory(AIDSObject):
+    """Base story object. The action_field attribute is
+    a string that is meant to be passed to eval to get the action
+    objects.
+    """
     action_field: str = '[\"actions\"]'
 
     def __init__(self, title: str = "", actions: int = 0):
@@ -204,24 +227,26 @@ class BaseStory(AIDSObject):
         self.title = title
         self.actions = actions
 
-    def _add(self, value: dict):
-        self.data.update(value)
+    def add(self, value: dict):
+        """This handles the exception that __setitem__ could raise.
+        """
+        key = (
+            (value['title']),
+            len(eval('value' + self.action_field))
+        )
         try:
-            self.validate(value)
-        except ValidationError as e:
-            raise
-        else:
-            self.clean_titles(self.data)
-            self.update({((value['title']),len(eval('value' + self.action_field))): self.data})
+            self.__setitem__(key, value)
+        except ValidationError:
+            pass
 
-    def validate(self, value):
-        validators = [
+    @property
+    def _validators(self):
+        self.validators = [
             FieldValueIs('title', self.title),
             FieldLenLargerThan(self.action_field, self.actions),
             FieldNotBlank(('title',))
         ]
-        for validator in validators:
-            validator.validate(value)
+        return self.validators
 
 class Scenario(BaseScenario):
     """AID Scenario model container."""

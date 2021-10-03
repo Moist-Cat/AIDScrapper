@@ -1,25 +1,27 @@
-AIDScrapper
+#AIDScrapper
 
-Tweaked version of ScriptAnon stuff getter.
-
-Added/Changed functions:
-
-	--publish
-		publish scenario form story.json to the Club, so you do not need to copy-paste.
-	--selective save: 
-		Save the stories that actually had content by giving a min number of actions for saving a story.
-		Also, you have the chance to save an unique scenario or stories with the same name.
-	--human freiendly html:
-		When the scenarios are converted form JSON to html you do not get a mess of ids, but 
-		a human-friendly, folder-divided directory with all your stories placed in a intuitive way. Is also integrated with 
-		scriptanon index.
-	--mass dump scenarios to AID:
-		Making easier switch accounts
-	
+Based off a small script made by an Anonymous user. Now it's a full featured client which supports not only [AID][0] but also [Holo][0]. Alternatively, it can transform AID scenario objects in .scenario files for compatibility with the different AI Dynamic Storytelling platforms, specially [NAI][2]
+The json files can be transformed into .html for better readability although that's not the main purpose of this tool - you should upload it to one of the supported websites to use the stories.
 
 # Requirements
+To install all requirements, use the following snippet after installing python on your machine.
 
-Needs BeautifulSoup and requests for scraping.
-pip install -r requirements.txt to install all dependencies.
+    pip install -r requirements.txt
 
-After install type "python manage.py help" for commands or/and "python manage.py test" to... well, test the module functionalities.
+Or just use:
+
+    pip install aids
+
+To install the whole thing. You can manage it directly from console. Use
+
+    aids help
+
+Afterwards for a list of commands.
+
+
+# Testing
+If you feel like messing around with the code make sure none of the tests are failing using the *test* command. It uses pytest if you have it installed or unittest as a fallback.
+
+[0]: https://play.aidungeon.io
+[1]: https://www.writeholo.com
+[2]: https://novelai.net/

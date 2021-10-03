@@ -1,3 +1,4 @@
+from getpass import getpass
 import json
 import glob
 import os
@@ -176,8 +177,7 @@ def _json_to_scenario(source_file: Union[str, Path]) -> 'NAIScenario':
             'context':[memory_scheme.copy(), an_scheme.copy()],
             'lorebook': {'entries': entries.copy()}
         })
-
-        model.add(data_scheme)
+        model.add(data_scheme.copy())
         print('-------------------------------------')
         print(f'Your AID scenario \"{scenario["title"]}\" was successfully ' \
                 're-formatted.')
@@ -187,7 +187,7 @@ def _json_to_scenario(source_file: Union[str, Path]) -> 'NAIScenario':
 
 def test():
     if pytest:
-        os.system(f'pytest aids/app/tests.py')
+        os.system(f'pytest {str(BASE_DIR)}/app/tests.py')
     else:
         os.system(f'python -m unittest -v aids.app.tests')
 
@@ -195,7 +195,17 @@ def help():
     with open(BASE_DIR / 'help.txt') as file:
         print(file.read())
 
-def all_to_html(
+def register():
+    with open(BASE_DIR / 'app/secrets.json', 'w') as file:
+        keys = {
+            "TOR_PASSWORD": "",
+            "AID_TOKEN": "",
+            "AID_USERNAME": getpass("AID username: "),
+            "AID_PASSWORD": getpass("AID password: ")
+        }
+        json.dump(keys, file)
+
+def alltohtml(
         file_dir: Union[str, Path]='',
         story_outfile: str='',
         scenario_outfile: str=''
