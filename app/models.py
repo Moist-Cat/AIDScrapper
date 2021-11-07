@@ -1,3 +1,5 @@
+import os
+import glob
 from pathlib import Path
 # import traceback
 from abc import ABC, abstractmethod
@@ -121,6 +123,12 @@ class AIDSObject(ABC, dict):
         try:
             with open(self.default_json_file, "w") as file:
                 json.dump(tuple(self.values()), file)
+            # check if there are too many backups
+            backup_files = glob.glob(str(self.default_backups_file.parent / "*.json"))
+            if len(backup_files) > 100:
+                # remove the last files
+                for file in backup_files[99:]:
+                    os.remove(file)
             with open(self.default_backups_file, "w") as file:
                 json.dump(tuple(self.values()), file)
         except json.decoder.JSONDecodeError:
