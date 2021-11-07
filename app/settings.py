@@ -20,12 +20,22 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 WARNINGS = 1
 
 # secrets
+secrets_form = {
+    "TOR_PASSWORD": "",
+    "AID_TOKEN": "",
+    "AID_USERNAME": "",
+    "AID_PASSWORD": ""
+}
 try:
     with open(BASE_DIR / 'app/secrets.json') as file:
         secrets = json.load(file)
 except FileNotFoundError:
     if WARNINGS:
         warnings.warn('File with credentials was not found.')
+except json.decoder.JSONDecodeError:
+    # First time, create the file
+    with open(BASE_DIR / 'app/secrets.json', 'w') as file:
+        file.write(json.dumps(secrets_form))
 
 def get_secret(setting):
     try:

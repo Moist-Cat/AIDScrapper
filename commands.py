@@ -12,7 +12,7 @@ except ImportError:
 
 from aids.app.client import AIDScrapper, ClubClient, HoloClient, bs4
 import aids.to_html as to_html
-from aids.app.settings import BASE_DIR
+from aids.app.settings import BASE_DIR, secrets_form
 from aids.app.models import NAIScenario, Scenario
 
 
@@ -198,13 +198,11 @@ def help():
 
 def register():
     with open(BASE_DIR / 'app/secrets.json', 'w') as file:
-        keys = {
-            "TOR_PASSWORD": "",
-            "AID_TOKEN": "",
+        secrets_form.update({
             "AID_USERNAME": input("AID username: "),
             "AID_PASSWORD": getpass("AID password: ")
-        }
-        json.dump(keys, file)
+        })
+        json.dump(secrets_form, file)
 
 def alltohtml(
         file_dir: Union[str, Path]='',
