@@ -6,6 +6,7 @@ import traceback
 import random
 import re
 import requests
+
 try:
     import bs4
 except ImportError:
@@ -15,34 +16,18 @@ try:
     from aids.app.obfuscate import get_tor_session, renew_connection
 except:
     stem = None
+from fake_headers import Headers
 
 from aids.app.models import Story, Scenario, ValidationError
 from aids.app.writelogs import log_error, log
 from aids.app import settings, writelogs, schemes
-
-# this import must go after settings bacause we might need them
-# to use our "fake-headers"
-try:
-    from fake_headers import Headers
-except ImportError:
-    class Headers:
-        def generate(self):
-            return re.sub(settings.headers, 'Chrome/%d.', f'Chrome/{random.randint(60,90)}.')
 
 def check_errors(request):
     def inner_func(cls, method, url, **kwargs):
         request_success = False
         while not request_success:
             try:
-                #start = time.time()
-                #log('debug', f'Trying to {method} data from {url}...')
                 response = request(cls, method, url, **kwargs)
-                #time_elapsed = time.time() - start
-                #log(
-                #    'debug',
-                #    f'The response from the server after {time_elapsed:.2f} seconds '\
-                #    f'was {len(response.text)} characters big. URL: {response.url}'
-                #)
                 response.raise_for_status()
             except (
                     requests.exceptions.ConnectionError, requests.exceptions.SSLError
