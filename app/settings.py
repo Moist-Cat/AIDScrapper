@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 import json
 import warnings
@@ -16,6 +17,12 @@ DEFAULT_MIN_ACT = 10
 # could be changed to cwd() to use this module from console after
 # a pip install.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+
+try:
+    os.mkdir(BASE_DIR / 'backups')
+except FileExistsError:
+    pass
 
 WARNINGS = 1
 

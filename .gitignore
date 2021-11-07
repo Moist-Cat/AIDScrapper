@@ -11,7 +11,7 @@ scenarios/
 __pycache__/
 
 # backups
-backups/
+backups/*
 !/backups/.gitkeep
 
 #logs
