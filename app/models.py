@@ -5,7 +5,7 @@ from pathlib import Path
 from abc import ABC, abstractmethod
 from collections.abc import MutableMapping
 import json
-import datetime
+from datetime import datetime
 
 from typing import Any, List, Dict
 
@@ -68,6 +68,10 @@ class AIDSObject(ABC, dict):
 
     def __init__(self):
 
+        self.timestamp = (
+            datetime.today().strftime("%Y-%m-%d %H:%M:%S") if os.name != 'nt' else
+            datetime.today().strftime("%Y-%m-%d %H'%M'%S")
+        )
         # notice that - unlike the backup path - this one is relative
         # using the module via commands from another directory will dump
         # the stories to that directory
@@ -76,7 +80,7 @@ class AIDSObject(ABC, dict):
         self.default_scenario_path = Path().cwd()
         self.default_backups_file = (
             BASE_DIR / f"backups/"
-            f"{self.__class__.__name__.lower()}_{datetime.datetime.today()}.json"
+            f"{self.__class__.__name__.lower()}_{self.timestamp}.json"
         )
 
     def __len__(self):
@@ -274,7 +278,7 @@ class NAIScenario(BaseScenario):
             try:
                 with open(
                     self.default_scenario_path /
-                    f"{scenario['title']}-{str(datetime.datetime.today())}.scenario",
+                    f"{scenario['title']}-{self.timestamp}.scenario",
                     "w"
                 ) as file:
                     json.dump(scenario, file)
