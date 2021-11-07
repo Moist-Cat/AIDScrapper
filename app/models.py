@@ -5,7 +5,6 @@ from pathlib import Path
 from abc import ABC, abstractmethod
 from collections.abc import MutableMapping
 import json
-import datetime
 # Compatibility with Windows -- we can not add : to the path there
 import uuid
 import sys
@@ -77,10 +76,10 @@ class AIDSObject(ABC, dict):
         self.default_json_file = f"{self.__class__.__name__.lower()}.json"
         # right here
         self.default_scenario_path = Path().cwd()
-        unique_indendifier = str(datetime.datetime.today() if sys.platform == 'linux' else uuid.uuid4())
+        self.unique_indendifier = str(uuid.uuid4())
         self.default_backups_file = (
             BASE_DIR / f"backups" /
-            f"{self.__class__.__name__.lower()}_{unique_indendifier}.json"
+            f"{self.__class__.__name__.lower()}_{self.unique_indendifier}.json"
         )
 
     def __len__(self):
@@ -278,7 +277,7 @@ class NAIScenario(BaseScenario):
             try:
                 with open(
                     self.default_scenario_path /
-                    f"{scenario['title']}-{str(datetime.datetime.today())}.scenario",
+                    f"{scenario['title']}_{self.unique_indendifier}.scenario",
                     "w"
                 ) as file:
                     json.dump(scenario, file)

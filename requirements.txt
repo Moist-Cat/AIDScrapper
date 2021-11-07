@@ -1,2 +1,4 @@
 requests
 bs4
+jinja2
+fake-headers
