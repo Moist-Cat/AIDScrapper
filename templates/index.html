@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block body %}
+    {% for obj in objects %}
+		<li date="{{ obj["createdAt"] }}">
+			<a href="{{ content_type }}/{{ obj["title"] }}.html">
+				{{ obj["title"] }}
+			</a>
+		</li>
+	{% endfor %}
+{% endblock %}

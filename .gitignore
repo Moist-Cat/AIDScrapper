@@ -1,11 +1,11 @@
 # Scraped or sensitive data
-*index.html
+*_index.html
 stories/
 scenarios/
 *.json
-index.html
 *.scenario
 !The_Layover.scenario
+!Family.json
 
 # python cache
 __pycache__/
