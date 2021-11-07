@@ -40,5 +40,10 @@ headers = {
             'User-Agent':'Mozilla/5.0 (X11; Fedora; Linux x86_64) ' \
                          'AppleWebKit/537.36 (KHTML, like Gecko) ' \
                          'Chrome/90.0.4430.93 Safari/537.36',
+            'Referer': 'https://play.aidungeon.io/',
+            'Origin': 'https://play.aidungeon.io',
+            'Host': 'api.aidungeon.io',
+            'DNT': '1',
+            'Accept-Language': 'en-US,en;q=0.9',
             'content-type': 'application/json'
 }

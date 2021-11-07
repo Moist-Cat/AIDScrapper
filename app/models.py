@@ -22,7 +22,7 @@ class FieldValueIs:
         self.value = value
 
     def validate(self, data):
-        if self.value and data[self.field] != self.value:
+        if self.value and data[self.field] != self.value and not ("isOption" in data): # ignore subscens
             raise ValidationError(
                 f"Invalid {self.field}. It should have been "
                 f"{self.value} got {data[self.field]}"
@@ -49,7 +49,8 @@ class FieldNotBlank:
 
     def validate(self, data):
         for field in self.fields:
-            if not data[field]:
+            # options do not count
+            if not data[field] and not ("options" in data and any(data["options"])):
                 raise ValidationError(f"{field} can not be blank")
 
 
@@ -77,7 +78,7 @@ class AIDSObject(ABC, dict):
         )
 
     def __len__(self):
-        super().__len__()
+        return len(self.keys())
 
     def __iter__(self):
         return super().__iter__()
@@ -170,15 +171,11 @@ class AIDSObject(ABC, dict):
         assert "title" in data
         try:
             data["title"] = data["title"].replace("/", "-").replace("\\", "-")
-        except (KeyError):
+        except KeyError:
             data["title"] = "Untitled"
         if "options" in data:
-            data["options"] = [
-                option.update(
-                    {"title": option["title"].replace("/", "-").replace("\\", "-")}
-                )
-                for option in data["options"]
-            ]
+            for option in data["options"]:
+                option["title"] = option["title"].replace("/", "-").replace("\\", "-")
         return data
 
 class BaseScenario(AIDSObject):
@@ -231,7 +228,7 @@ class BaseStory(AIDSObject):
         """This handles the exception that __setitem__ could raise.
         """
         key = (
-            (value['title']),
+            value['title'],
             len(eval('value' + self.action_field))
         )
         try:

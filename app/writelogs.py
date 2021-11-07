@@ -6,7 +6,7 @@ from aids.app.settings import BASE_DIR, DEACTIVATE_LOG
 
 
 # default is linux console.
-ERROR_FILE =  BASE_DIR / 'client.error' # '/dev/stdout'
+ERROR_FILE =  BASE_DIR / 'app/client.error' # '/dev/stdout'
 LOG_FILE = '/dev/stdout' #BASE_DIR / 'app/client.log'
 
 

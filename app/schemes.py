@@ -211,122 +211,20 @@ AIDStoryScheme = FrozenKeyDict(merge(DEFAULT, aditional_keys['aid_story']))
 NAIScenScheme = FrozenKeyDict(merge(DEFAULT, aditional_keys['nai_scen']))
 
 # AID
-stories_query = {
-            "variables": {
-                "input": {
-                    "searchTerm": "",
-                    "saved": False,
-                    "trash": False,
-                    "contentType": "adventure",
-                    "sortOrder": "createdAt",
-                    "offset": 0
-                }
-            },
-            "query": """
-        query ($input: SearchInput) {
-            user {
-                search(input: $input) {
-                    ...ContentListSearchable
-                }
-            }
-        }
+story_query = {"variables": {"publicId":""},"query":"query ($publicId: String) {\n  adventure(publicId: $publicId) {\n    id\n    userId\n    isOwner\n    userJoined\n    publicId\n    published\n    storySummary\n    enableSummarization\n    blockedAt\n    actions {\n      id\n      text\n      __typename\n    }\n    ...ContentHeadingSearchable\n    ...ContentOptionsSearchable\n    __typename\n  }\n}\n\nfragment ContentHeadingSearchable on Searchable {\n  id\n  title\n  description\n  tags\n  published\n  publicId\n  ... on Adventure {\n    actionCount\n    __typename\n  }\n  createdAt\n  updatedAt\n  deletedAt\n  ... on Adventure {\n    scenario {\n      id\n      title\n      publicId\n      published\n      deletedAt\n      __typename\n    }\n    __typename\n  }\n  user {\n    isCurrentUser\n    ...UserTitleUser\n    __typename\n  }\n  ...ContentStatsVotable\n  ...ContentStatsCommentable\n  __typename\n}\n\nfragment ContentStatsVotable on Votable {\n  ...VoteButtonVotable\n  __typename\n}\n\nfragment VoteButtonVotable on Votable {\n  id\n  userVote\n  totalUpvotes\n  __typename\n}\n\nfragment ContentStatsCommentable on Commentable {\n  ...CommentButtonCommentable\n  __typename\n}\n\nfragment CommentButtonCommentable on Commentable {\n  id\n  publicId\n  allowComments\n  totalComments\n  __typename\n}\n\nfragment UserTitleUser on User {\n  id\n  username\n  icon\n  ...UserAvatarUser\n  __typename\n}\n\nfragment UserAvatarUser on User {\n  id\n  username\n  avatar\n  __typename\n}\n\nfragment ContentOptionsSearchable on Searchable {\n  id\n  publicId\n  published\n  isOwner\n  title\n  userId\n  deletedAt\n  blockedAt\n  ... on Savable {\n    isSaved\n    __typename\n  }\n  ... on Adventure {\n    userJoined\n    __typename\n  }\n  __typename\n}\n"}
 
-        fragment ContentListSearchable on Searchable {
-            ...ContentCardSearchable
-        }
-
-        fragment ContentCardSearchable on Searchable {
-            id
-            publicId
-            title
-            description
-            createdAt
-            updatedAt
-
-            ... on Adventure {
-                type
-                score
-                memory
-                authorsNote
-                worldInfo
-                score
-
-                actions {
-                    ...ActionSubscriptionAction
-                }
-
-                undoneWindow {
-                    ...ActionSubscriptionAction
-                }
-            }
-        }
-
-        fragment ActionSubscriptionAction on Action {
-            id
-            text
-            type
-            createdAt
-        }
-        """.replace('\t', '')
-}
-
+# notice the sorting order
+stories_query  = {"variables":{"input":{"searchTerm":"","saved":False,"trash":False,"contentType":"adventure","sortOrder":"actionCount"}}
+    ,"query":"query ($input: SearchInput) {\n  user {\n    id\n    search(input: $input) {\n      ...ContentListSearchable\n      __typename\n    }\n    __typename\n  }\n}\n\nfragment ContentListSearchable on Searchable {\n  ...ContentCardSearchable\n  __typename\n}\n\nfragment ContentCardSearchable on Searchable {\n  id\n  publicId\n  userId\n  title\n  description\n  tags\n  createdAt\n  publishedAt\n  updatedAt\n  deletedAt\n  published\n  isOwner\n  user {\n    ...UserTitleUser\n    __typename\n  }\n  ... on Adventure {\n    actionCount\n    userJoined\n    blockedAt\n    scenario {\n      id\n      title\n      publicId\n      published\n      deletedAt\n      __typename\n    }\n    __typename\n  }\n  ...ContentOptionsSearchable\n  ...DeleteButtonSearchable\n  ...SaveButtonSavable\n  __typename\n}\n\nfragment ContentOptionsSearchable on Searchable {\n  id\n  publicId\n  published\n  isOwner\n  title\n  userId\n  deletedAt\n  blockedAt\n  ... on Savable {\n    isSaved\n    __typename\n  }\n  ... on Adventure {\n    userJoined\n    __typename\n  }\n  __typename\n}\n\nfragment DeleteButtonSearchable on Searchable {\n  id\n  publicId\n  published\n  __typename\n}\n\nfragment SaveButtonSavable on Savable {\n  id\n  isSaved\n  __typename\n}\n\nfragment UserTitleUser on User {\n  id\n  username\n  icon\n  ...UserAvatarUser\n  __typename\n}\n\nfragment UserAvatarUser on User {\n  id\n  username\n  avatar\n  __typename\n}\n"}
 # Scenarios
-CSS = """
-        fragment ContentCardSearchable on Scenario {
-            id
-            publicId
-            title
-            description
-            tags
-            createdAt
-            updatedAt
-            memory
-            authorsNote
-            mode
-            prompt
-            quests
-            worldInfo
-            gameCode
-            options {
-                publicId
-                title
-                createdAt
-            }
-}"""
 
-scenarios_query = {
-            "variables": {
-                "input": {
-                    "searchTerm": "",
-                    "saved": False,
-                    "trash": False,
-                    "contentType": "scenario",
-                    "sortOrder": "createdAt",
-                    "offset": 0
-                }
-            },
-            "query": ("""
-        query ($input: SearchInput) {
-            user {
-                id
-                search(input: $input) {
-                    ...ContentCardSearchable
-                }
-            }
-        }
-""" + CSS).replace('\t', '')}
+scenarios_query = {"variables":{"input":{"searchTerm":"","saved":False,"trash":False,"contentType":"scenario","sortOrder":"createdAt", "offset": 0}},"query":"query ($input: SearchInput) {\n  user {\n    id\n    search(input: $input) {\n      ...ContentListSearchable\n      __typename\n    }\n    __typename\n  }\n}\n\nfragment ContentListSearchable on Searchable {\n  ...ContentCardSearchable\n  __typename\n}\n\nfragment ContentCardSearchable on Searchable {\n  id\n  publicId\n  userId\n  title\n  description\n  tags\n  createdAt\n  publishedAt\n  updatedAt\n  deletedAt\n  published\n  isOwner\n  user {\n    ...UserTitleUser\n    __typename\n  }\n  ... on Adventure {\n    actionCount\n    userJoined\n    blockedAt\n    scenario {\n      id\n      title\n      publicId\n      published\n      deletedAt\n      __typename\n    }\n    __typename\n  }\n  ...ContentOptionsSearchable\n  ...DeleteButtonSearchable\n  ...SaveButtonSavable\n  __typename\n}\n\nfragment ContentOptionsSearchable on Searchable {\n  id\n  publicId\n  published\n  isOwner\n  title\n  userId\n  deletedAt\n  blockedAt\n  ... on Savable {\n    isSaved\n    __typename\n  }\n  ... on Adventure {\n    userJoined\n    __typename\n  }\n  __typename\n}\n\nfragment DeleteButtonSearchable on Searchable {\n  id\n  publicId\n  published\n  __typename\n}\n\nfragment SaveButtonSavable on Savable {\n  id\n  isSaved\n  __typename\n}\n\nfragment UserTitleUser on User {\n  id\n  username\n  icon\n  ...UserAvatarUser\n  __typename\n}\n\nfragment UserAvatarUser on User {\n  id\n  username\n  avatar\n  __typename\n}\n"}
 
-subscen_query = {
-            "variables": {
-                "publicId": ""
-            },
-            "query": ("""
-        query ($publicId: String) {
-            scenario(publicId: $publicId) {
-                ...ContentCardSearchable
-            }
-        }
-""" + CSS).replace('\t', '')}
+scenario_query = {"variables":{"publicId":""},"query":"query ($publicId: String) {\n  scenario(publicId: $publicId) {\n    ...ScenarioEditScenario\n    __typename\n  }\n}\n\nfragment ScenarioEditScenario on Scenario {\n  id\n  publicId\n  allowComments\n  createdAt\n  deletedAt\n  description\n  memory\n  authorsNote\n  musicTheme\n  nsfw\n  prompt\n  published\n  featured\n  safeMode\n  tags\n  thirdPerson\n  title\n  updatedAt\n  blockedAt\n  options {\n    id\n    publicId\n    title\n    __typename\n  }\n  ...ContentOptionsSearchable\n  ...DeleteButtonSearchable\n  __typename\n}\n\nfragment ContentOptionsSearchable on Searchable {\n  id\n  publicId\n  published\n  isOwner\n  title\n  userId\n  deletedAt\n  blockedAt\n  ... on Savable {\n    isSaved\n    __typename\n  }\n  ... on Adventure {\n    userJoined\n    __typename\n  }\n  __typename\n}\n\nfragment DeleteButtonSearchable on Searchable {\n  id\n  publicId\n  published\n  __typename\n}\n"}
+
+wi_query = {"variables":{"type":"Active","page":0,"match":"","pageSize": 1000,"contentPublicId":"","contentType":"scenario","filterUnused":False},"query":"query ($type: String, $page: Int, $match: String, $pageSize: Int, $contentPublicId: String, $contentType: String, $filterUnused: Boolean) {\n  worldInfoType(type: $type, page: $page, match: $match, pageSize: $pageSize, contentPublicId: $contentPublicId, contentType: $contentType, filterUnused: $filterUnused) {\n    id\n    description\n    name\n    genre\n    tags\n    userId\n    type\n    generator\n    attributes\n    keys\n    entry\n    countContentWorldInfo\n    publicId\n    __typename\n  }\n  currentWorldInfoCount(type: $type, match: $match, contentPublicId: $contentPublicId, contentType: $contentType, filterUnused: $filterUnused)\n}\n"}
+
+subscen_query = {"variables":{"publicId":""},"query":"query ($publicId: String) {\n  scenario(publicId: $publicId) {\n    memory \ntitle \nauthorsNote\n prompt\n    ...SelectOptionScenario\n    __typename\n  }\n}\n\nfragment SelectOptionScenario on Scenario {\n  id\n  prompt\n  publicId\n  options {\n    id\n    publicId\n    title\n    __typename\n  }\n  __typename\n}\n"}
 
 aid_loginpayload = {
     "variables": {

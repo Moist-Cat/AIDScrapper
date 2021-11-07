@@ -34,7 +34,7 @@ class toHtml:
 
         story_templ = self.env.get_template('story.html')
         story_number = {}
-        for story in stories:
+        for story in reversed(stories):
             if story['title']:
                 story['title'] = story['title'].replace('/', '-')
             try:
@@ -87,7 +87,7 @@ class toHtml:
 
         subscen_paths = {}
         parent_scen = []
-        for scenario in scenarios:
+        for scenario in reversed(scenarios):
             scenario['title'] = scenario['title'].replace('/', '-')
             if 'isOption' not in scenario or not scenario['isOption']:
                 # base scenario, initializing the path
@@ -107,27 +107,26 @@ class toHtml:
                 parent_scen.append(scenario)
             else:
                 scenario['path'] = subscen_paths[scenario['title']]
-            if 'options' in scenario:
+                
+                with open(
+                        self.out_path /
+                        f'{scenario["path"]}/{scenario["title"]}.html',
+                        'w'
+                ) as file:
+                    scen_templ = self.env.get_template('scenario.html')
+                    file.write(
+                        scen_templ.render({
+                            'scenario': scenario,
+                            'content_type': 'scenario'
+                        })
+                    )
+            if "options" in scenario and any(scenario['options']):
                 for subscen in scenario['options']:
-                    subscen['title'] = subscen['title'].replace('/', '-')
-                    subscen['path'] = f'{scenario["path"]}{scenario["title"]}'
-                    subscen_paths[subscen['title']] = subscen['path'] + '/'
-                    self.new_dir(subscen['path'])
-
-                    """
-                    with open(
-                            self.out_path /
-                            f'{subscen["path"]}/{subscen["title"]}.html',
-                            'w'
-                    ) as file:
-                        scen_templ = self.env.get_template('scenario.html')
-                        file.write(
-                            scen_templ.render({
-                                'scenario': scenario,
-                                'content_type': 'scenario'
-                            })
-                        )
-                    """
+                    if subscen and "title" in subscen:
+                        subscen['title'] = subscen['title'].replace('/', '-')
+                        subscen['path'] = f'{scenario["path"]}{scenario["title"]}'
+                        subscen_paths[subscen['title']] = subscen['path'] + '/'
+                        self.new_dir(subscen['path'])
 
         index = self.env.get_template('index.html')
         with open(self.out_path / 'scen_index.html', 'w') as outfile:

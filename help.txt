@@ -21,6 +21,8 @@ COMMANDS
     alltohtml      Transform all objects in their respective .json file and dumps them in form of human-friendly html files.
     
     test           Run the tests suite. It only covers part the application layer -- anything else would require an account and credentials.
+    
+    register       Register credentials to use with the tool.
 
 COMMAND LINE OPTIONS
     -a             Minimal actions that all downloaded stories must have.

@@ -16,7 +16,7 @@ try:
 except:
     stem = None
 
-from aids.app.models import Story, Scenario
+from aids.app.models import Story, Scenario, ValidationError
 from aids.app.writelogs import log_error, log
 from aids.app import settings, writelogs, schemes
 
@@ -34,15 +34,15 @@ def check_errors(request):
         request_success = False
         while not request_success:
             try:
-                start = time.time()
-                log('debug', f'Trying to {method} data from {url}...')
+                #start = time.time()
+                #log('debug', f'Trying to {method} data from {url}...')
                 response = request(cls, method, url, **kwargs)
-                time_elapsed = time.time() - start
-                log(
-                    'debug',
-                    f'The response from the server after {time_elapsed:.2f} seconds '\
-                    f'was {len(response.text)} characters big. URL: {response.url}'
-                )
+                #time_elapsed = time.time() - start
+                #log(
+                #    'debug',
+                #    f'The response from the server after {time_elapsed:.2f} seconds '\
+                #    f'was {len(response.text)} characters big. URL: {response.url}'
+                #)
                 response.raise_for_status()
             except (
                     requests.exceptions.ConnectionError, requests.exceptions.SSLError
@@ -60,6 +60,9 @@ def check_errors(request):
                     errors = response.json()['errors']
                 except json.decoder.JSONDecodeError:
                     errors = 'No errors'
+                except KeyError:
+                    # 
+                    errors = response.json()
                 raw_response = response.content[:20] if len(response.content) > 50 else response.content
                 try:
                     payload = kwargs['data']
@@ -77,7 +80,7 @@ def check_errors(request):
                 raise
             else:
                 request_success = True
-            time.sleep(3)
+            #time.sleep(3)
         return response
     return inner_func
 
@@ -161,11 +164,14 @@ class AIDScrapper(BaseClient):
 
         # Get all settings
         self.stories_query = schemes.stories_query
+        self.story_query = schemes.story_query
         self.create_scen_payload = schemes.create_scen_payload
         self.update_scen_payload = schemes.update_scen_payload
         self.make_WI_payload = schemes.make_WI_payload
         self.update_WI_payload = schemes.update_WI_payload
         self.scenarios_query = schemes.scenarios_query
+        self.scenario_query = schemes.scenario_query
+        self.wi_query = schemes.wi_query
         self.subscen_query = schemes.subscen_query
         self.aid_loginpayload = schemes.aid_loginpayload
 
@@ -188,10 +194,25 @@ class AIDScrapper(BaseClient):
         key = self.get_login_token(credentials)
 
         self.session.headers.update({'x-access-token': key})
-        log('log', 'logged in AID')
+        log('log', f'User \"{username}\" sucessfully logged into AID')
+
+    def _get_story_content(self, story_id: str) -> dict:
+        self.story_query.update({"variables": {"publicId": story_id}})
+        return self.session.post(self.url, json=self.story_query).json()["data"]["adventure"]
+    
+    def _get_scenario_content(self, scenario_id: str) -> dict:
+        self.scenario_query.update({"variables": {"publicId": scenario_id}})
+        wi = self._get_wi(scenario_id)
+        scenario = self.session.post(self.url, json=self.scenario_query).json()["data"]["scenario"]
+        scenario.update({"worldInfo": wi})
+        return scenario
+
+    def _get_wi(self, scenario_id: str) -> dict:
+        self.wi_query["variables"].update({"contentPublicId": scenario_id})
+        return self.session.post(self.url, json=self.wi_query).json()["data"]["worldInfoType"]
 
     def _get_object(self, query: dict):
-        query['variables']['input']['searchTerm'] = self.adventures.title
+        query['variables']['input']['searchTerm'] = self.adventures.title or self.prompts.title
 
         return self.session.post(
             self.url,
@@ -200,80 +221,67 @@ class AIDScrapper(BaseClient):
             )
         ).json()['data']
 
-    def retrieve_data(self):
-        for scenario, story in (self.my_scenarios, self.my_stories):
-            self.prompts.add(scenario)
-            self.adventures.add(story)
-
-    @property
-    def my_stories(self) -> List[Dict]:
-        stories: List[Dict] = []
+    def get_stories(self) -> List[Dict]:
         while True:
-            self.stories_query['variables']['input']['searchTerm'] = self.adventures.title
-
             result = self._get_object(self.stories_query)['user']['search']
 
             if result:
-                stories.extend(result)
-                log('debug', f'Got {len(stories)} stories so far')
+                for story in result:
+                    s = self._get_story_content(story["publicId"])
+                    if not self.adventures.title:
+                        # this ensures uniqueness
+                        # it is usually handled by the model but we need
+                        # to handle this exception ourselves
+                        try:
+                            self.adventures[s["title"], len(s["actions"])] = s
+                        except ValidationError:
+                            # actions are under the limit. Abort.
+                            return
+                        
+                    else:
+                        self.adventures.add(s)
+                    log("log", f"Loaded story: \"{story['title']}\"")
+                log('debug', f'Got {len(self.adventures)} stories so far')
                 self.stories_query['variables']['input']['offset'] = len(
-                                                                         stories
+                                                                         self.adventures
                                                                      )
             else:
                 log('log', 'All stories downloaded')
                 break
-        return stories
 
-    @property
-    def my_scenarios(self) -> List[Dict]:
-        scenarios: List[Dict] = []
+    def get_scenarios(self) -> List[Dict]:
         while True:
-            self.scenarios_query['variables']['input']['searchTerm'] = self.prompts.title
-
             result: List[Dict] = self._get_object(self.scenarios_query)['user']['search']
 
             if result:
                 for scenario in result:
-                    if isinstance(scenario['options'], Sequence):
-                        scenarios.extend([
-                            self.get_subscenarios(
-                                option['publicId']
-                            ) for option in scenario['options']
-                        ])
-                    scenarios.append(scenario)
-
-                log('debug', f'Got {len(scenarios)} scenarios so far')
+                    self.add_all_scenarios(scenario["publicId"])
+                log('debug', f'Got {len(self.prompts)} scenarios so far')
                 self.scenarios_query['variables'] \
                                     ['input'] \
                                     ['offset'] = len(
-                                                     scenarios
+                                                     self.prompts
                                                  ) + self.discarded_stories
             else:
                 log('log', 'All scenarios downloaded')
                 self.discarded_stories = 0
                 break
-            return scenarios
 
-    def get_subscenarios(self, pubid) -> List[Dict]:
-        self.subscen_query['variables']['publicId'] = pubid
+    def add_all_scenarios(self, pubid, isOption=False) -> List[Dict]:
+        """Adds all scenarios and their children to memory
+        """
+        scenario = self._get_scenario_content(pubid)
+        scenario["isOption"] = isOption
 
-        subscen = self.session.post(
-                self.url,
-                data=json.dumps(self.subscen_query)
-        ).json()['data']['scenario']
-        subscen['isOption'] = True
-
-        if isinstance(subscen['options'], Sequence):
-            subscens = [
-                self.get_subscenarios(
-                    option['publicId']
-                ) for option in subscen['options']
-            ]
-        subscens.extend(subscen)
-        # do not count subscens for the offset
-        self.discarded_stories -= len(subscens)
-
-        return subscens
+        if "options" in scenario and isinstance(scenario["options"], Sequence):
+            for option in scenario["options"]:
+                self.add_all_scenarios(
+                    option["publicId"], True
+                )
+                self.discarded_stories-=1
+        
+        log("log", f"Added {scenario['title']} to memory")
+        self.prompts.add(scenario)
 
     def get_login_token(self, credentials: dict):
         self.aid_loginpayload['variables']['identifier'] = \
@@ -325,7 +333,8 @@ class ClubClient(BaseClient):
 
         self.session.post(url, data=params)
 
-    def reformat_tags(self, tags):
+    @staticmethod
+    def reformat_tags(tags):
         nsfw = 'false'
         tags_str = ', '.join(tag for tag in tags)
         for tag in tags:

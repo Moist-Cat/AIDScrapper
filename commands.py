@@ -37,15 +37,17 @@ class Aid(AIDScrapper):
 
     def stories(self, title, min_act):
         self.adventures(title, min_act)
-        for story in self.my_stories:
-            self.adventures.add(story)
+
+        self.get_stories()
+
         self.adventures.dump()
         self.th.story_to_html()
 
     def scenarios(self, title):
         self.prompts(title)
-        for scenario in self.my_scenarios:
-            self.prompts.add(scenario)
+
+        self.get_scenarios()
+
         self.prompts.dump()
         self.th.scenario_to_html()
 
@@ -56,12 +58,11 @@ class Aid(AIDScrapper):
     def fenix(self):
         try:
             self.prompts.load()
-            self.upload_in_bulk(self.prompts.out)
+            self.upload_in_bulk(self.prompts)
         except FileNotFoundError:
-            for scenario in self.my_scenarios:
-                self.prompts.add(scenario)
+            self.get_scenarios()
             self.prompts.dump()
-            self.upload_in_bulk(self.prompts.out)
+            self.upload_in_bulk(self.prompts)
 class Holo(HoloClient):
     pass
 
@@ -200,7 +201,7 @@ def register():
         keys = {
             "TOR_PASSWORD": "",
             "AID_TOKEN": "",
-            "AID_USERNAME": getpass("AID username: "),
+            "AID_USERNAME": input("AID username: "),
             "AID_PASSWORD": getpass("AID password: ")
         }
         json.dump(keys, file)

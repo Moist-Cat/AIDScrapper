@@ -10,7 +10,7 @@ from aids.app.settings import BASE_DIR
 from aids.app.client import AIDScrapper
 from aids.app.models import Story, Scenario, ValidationError
 from aids.app.schemes import FrozenKeyDict
-from aids.commands import makejson, makenai, all_to_html
+from aids.commands import makejson, makenai, alltohtml
 
 TEST_DIR = BASE_DIR / 'app/test_files'
 
@@ -200,8 +200,8 @@ class TestDowloadFiles(unittest.TestCase):
         self.client.logout()
 
     def test_download(self):
-        assert self.client.my_scenarios
-        assert self.client.my_stories
+        assert self.client.get_scenarios()
+        assert self.client.get_stories()
 
 class TestHtmlFiles(unittest.TestCase):
 
@@ -211,7 +211,7 @@ class TestHtmlFiles(unittest.TestCase):
         with open(TEST_DIR / 'test_scen.json') as file:
             self.scen_in = json.load(file)
 
-        all_to_html(
+        alltohtml(
             TEST_DIR,
             'test_stories.json',
             'test_scen.json'
@@ -281,7 +281,7 @@ class TestHtmlFiles(unittest.TestCase):
         # match since  they are not organized.
         for h_action in html_actions:
             for s_action in story['actions']:
-                # One would argue that this could cause a false red flag 
+                # One could argue that this could cause a false red flag 
                 # but no one can do multiple actions in the same second (for now)
                 # so it is fine.
                 if h_action.attrs['date'] == s_action['createdAt']:
@@ -294,6 +294,23 @@ class TestHtmlFiles(unittest.TestCase):
         for wi in story['worldInfo']:
             self.assert_if_exists(body, wi['keys'])
             self.assert_if_exists(body, wi['entry'])
+    
+    def test_subscen_properly_structured(self):
+        alltohtml(TEST_DIR, scenario_outfile='Family.json')
+        # just check the path
+        with open(f'{TEST_DIR}/scenarios/Family Matters/Mom/Royal Duty(Mom).html', 'r') as file: pass
+        # check the files one by one
+        with open(f'{TEST_DIR}/scen_index.html') as file:
+            html = bs(file.read(), 'html5lib')
+            html.a.attrs['href'] = "scenarios/Family Matters.html"
+        with open(f'{TEST_DIR}/scenarios/Family Matters.html') as file:
+            html = bs(file.read(), 'html5lib')
+            html.a.attrs['href'] = "scenarios/Family Matters/Mom.html"
+        with open(f'{TEST_DIR}/scenarios/Family Matters/Mom.html') as file:
+            html = bs(file.read(), 'html5lib')
+            html.a.attrs['href'] = "scenarios/Family Matters/Mom/Royal Duty(Mom).html"
+        
+        href="scenarios/Family Matters.html"
 
 def run():
     unittest.main(verbosity=5)
