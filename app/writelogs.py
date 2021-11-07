@@ -60,5 +60,5 @@ def log_error(lvl, msg):
             pass
         with open(ERROR_FILE, 'a') as error_file:
             error_file.write(make_log_message(lvl, msg) + '\n')
-   else:
-       print(make_log_message(lvl, msg) + '\n')
+    else:
+        print(make_log_message(lvl, msg) + '\n')

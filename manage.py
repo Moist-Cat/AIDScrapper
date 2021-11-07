@@ -47,7 +47,7 @@ def get_command(argv: List[str] = sys.argv[1:]):
             platform = getattr(commands, cmd.platform)()
             command = getattr(platform, cmd.command)
         except AttributeError:
-            print('Unrecognized command')
+            print('Unrecognized command. Did you forget to add the -p flag?')
             return
         command(*required_args)
 
