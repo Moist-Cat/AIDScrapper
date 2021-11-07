@@ -162,7 +162,7 @@ class AIDSObject(ABC, dict):
                  "error",
                 f"Error while loading the data. {file.name} does not contain valid JSON."
             )
-        log("log", "{len(self)} objects loaded from the {file}")
+        log("log", f"{len(self)} objects loaded from the {file}")
 
     @abstractmethod
     def _validators(self) -> List[Any]:

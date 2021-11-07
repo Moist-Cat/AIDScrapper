@@ -172,10 +172,9 @@ class AIDScrapper(BaseClient):
         self.scenarios_query = schemes.scenarios_query
         self.scenario_query = schemes.scenario_query
         self.wi_query = schemes.wi_query
-        self.subscen_query = schemes.subscen_query
         self.aid_loginpayload = schemes.aid_loginpayload
 
-        self.discarded_stories = 0
+        self.offset = 0
 
     def login(self, credentials = None):
         if not credentials:
@@ -225,9 +224,10 @@ class AIDScrapper(BaseClient):
         while True:
             result = self._get_object(self.stories_query)['user']['search']
 
-            if result:
+            if any(result):
                 for story in result:
                     s = self._get_story_content(story["publicId"])
+                    self.offset += 1
                     if not self.adventures.title:
                         # this ensures uniqueness
                         # it is usually handled by the model but we need
@@ -242,9 +242,7 @@ class AIDScrapper(BaseClient):
                         self.adventures.add(s)
                     log("log", f"Loaded story: \"{story['title']}\"")
                 log('debug', f'Got {len(self.adventures)} stories so far')
-                self.stories_query['variables']['input']['offset'] = len(
-                                                                         self.adventures
-                                                                     )
+                self.stories_query['variables']['input']['offset'] = self.offset
             else:
                 log('log', 'All stories downloaded')
                 break
@@ -253,23 +251,21 @@ class AIDScrapper(BaseClient):
         while True:
             result: List[Dict] = self._get_object(self.scenarios_query)['user']['search']
 
-            if result:
+            if any(result):
                 for scenario in result:
                     self.add_all_scenarios(scenario["publicId"])
                 log('debug', f'Got {len(self.prompts)} scenarios so far')
                 self.scenarios_query['variables'] \
                                     ['input'] \
-                                    ['offset'] = len(
-                                                     self.prompts
-                                                 ) + self.discarded_stories
+                                    ['offset'] = self.offset
             else:
                 log('log', 'All scenarios downloaded')
-                self.discarded_stories = 0
+                self.offset = 0
                 break
 
     def add_all_scenarios(self, pubid, isOption=False) -> List[Dict]:
-        """Adds all scenarios and their children to memory
-        """
+        """Adds all scenarios and their children to memory"""
+
         scenario = self._get_scenario_content(pubid)
         scenario["isOption"] = isOption
 
@@ -277,11 +273,10 @@ class AIDScrapper(BaseClient):
             for option in scenario["options"]:
                 self.add_all_scenarios(
                     option["publicId"], True
-                )
-                self.discarded_stories-=1
-        
-        log("log", f"Added {scenario['title']} to memory")
+                )        
         self.prompts.add(scenario)
+        self.offset += 1 if not isOption else 0
+        log("log", f"Added {scenario['title']} to memory")
 
     def get_login_token(self, credentials: dict):
         self.aid_loginpayload['variables']['identifier'] = \
@@ -298,8 +293,11 @@ class AIDScrapper(BaseClient):
         log_error('crit', 'There was no data')
         return None
 
-    def upload_in_bulk(self, scenarios):
-        for scenario in scenarios:
+    def upload_in_bulk(self, scenarios: Dict[str, Dict]):
+        for key in scenarios:
+            scenario = scenarios[key]
+            
+            assert isinstance(scenario, dict)
             res = self.session.post(self.url,
                 data=json.dumps(self.create_scen_payload)
             ).json()['data']['createScenario']

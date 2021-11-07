@@ -224,8 +224,6 @@ scenario_query = {"variables":{"publicId":""},"query":"query ($publicId: String)
 
 wi_query = {"variables":{"type":"Active","page":0,"match":"","pageSize": 1000,"contentPublicId":"","contentType":"scenario","filterUnused":False},"query":"query ($type: String, $page: Int, $match: String, $pageSize: Int, $contentPublicId: String, $contentType: String, $filterUnused: Boolean) {\n  worldInfoType(type: $type, page: $page, match: $match, pageSize: $pageSize, contentPublicId: $contentPublicId, contentType: $contentType, filterUnused: $filterUnused) {\n    id\n    description\n    name\n    genre\n    tags\n    userId\n    type\n    generator\n    attributes\n    keys\n    entry\n    countContentWorldInfo\n    publicId\n    __typename\n  }\n  currentWorldInfoCount(type: $type, match: $match, contentPublicId: $contentPublicId, contentType: $contentType, filterUnused: $filterUnused)\n}\n"}
 
-subscen_query = {"variables":{"publicId":""},"query":"query ($publicId: String) {\n  scenario(publicId: $publicId) {\n    memory \ntitle \nauthorsNote\n prompt\n    ...SelectOptionScenario\n    __typename\n  }\n}\n\nfragment SelectOptionScenario on Scenario {\n  id\n  prompt\n  publicId\n  options {\n    id\n    publicId\n    title\n    __typename\n  }\n  __typename\n}\n"}
-
 aid_loginpayload = {
     "variables": {
         "identifier": "",
