@@ -6,6 +6,9 @@ from abc import ABC, abstractmethod
 from collections.abc import MutableMapping
 import json
 import datetime
+# Compatibility with Windows -- we can not add : to the path there
+import uuid
+import sys
 
 from typing import Any, List, Dict
 
@@ -74,9 +77,10 @@ class AIDSObject(ABC, dict):
         self.default_json_file = f"{self.__class__.__name__.lower()}.json"
         # right here
         self.default_scenario_path = Path().cwd()
+        unique_indendifier = str(datetime.datetime.today() if sys.platform == 'linux' else uuid.uuid4())
         self.default_backups_file = (
-            BASE_DIR / f"backups/"
-            f"{self.__class__.__name__.lower()}_{datetime.datetime.today()}.json"
+            BASE_DIR / f"backups" /
+            f"{self.__class__.__name__.lower()}_{unique_indendifier}.json"
         )
 
     def __len__(self):
@@ -162,7 +166,7 @@ class AIDSObject(ABC, dict):
                  "error",
                 f"Error while loading the data. {file.name} does not contain valid JSON."
             )
-        log("log", f"{len(self)} objects loaded from the {file}")
+        log("log", f"{len(self)} objects loaded from the {file.name}")
 
     @abstractmethod
     def _validators(self) -> List[Any]:

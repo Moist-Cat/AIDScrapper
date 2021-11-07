@@ -1,7 +1,6 @@
 import sys
 import os
 from datetime import datetime
-import traceback
 
 from aids.app.settings import BASE_DIR, DEACTIVATE_LOG
 
@@ -21,7 +20,7 @@ def log(lvl, msg):
     Logs a message in whatever file is the current default.
     """
     if DEACTIVATE_LOG:
-       return
+        return
 
     if lvl == 'init':
         msg = init_str + msg
@@ -49,7 +48,7 @@ def log_error(lvl, msg):
     Logs an error in whatever file is the current default.
     """
     if DEACTIVATE_LOG:
-       return
+        return
     # bigger than 1 mb
     if sys.platform == 'linux':
         try:
