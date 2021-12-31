@@ -63,6 +63,7 @@ class Aid(AIDScrapper):
             self.get_scenarios()
             self.prompts.dump()
             self.upload_in_bulk(self.prompts)
+
 class Holo(HoloClient):
     pass
 
@@ -114,8 +115,6 @@ def _scenario_to_json(source_files: Union[str, Path]):
     nai_file_name = glob.glob(str(source_files))
     model = Scenario()
 
-#    data_scheme = model.data.copy()
-
     for name in nai_file_name:
 
         with open(name) as file:
@@ -156,8 +155,8 @@ def _json_to_scenario(source_file: Union[str, Path]) -> 'NAIScenario':
     model = NAIScenario()
 
     data_scheme = model.data.copy()
-    memory_scheme = data_scheme['context'].pop(0)
     an_scheme = data_scheme['context'].pop()
+    memory_scheme = data_scheme['context'].pop()
     wi_entries_scheme = data_scheme['lorebook']['entries'].pop()
 
     with open(source_file) as file:
@@ -199,10 +198,11 @@ def help():
 def register():
     with open(BASE_DIR / 'app/secrets.json', 'w') as file:
         secrets_form.update({
-            "AID_USERNAME": input("AID username: "),
+            "AID_USERNAME": (user := input("AID username: ")),
             "AID_PASSWORD": getpass("AID password: ")
         })
         json.dump(secrets_form, file)
+        print(f"User {user} successfully registered.")
 
 def alltohtml(
         file_dir: Union[str, Path]='',

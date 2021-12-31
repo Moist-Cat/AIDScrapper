@@ -12,8 +12,8 @@ LOG_FILE = '/dev/stdout' #BASE_DIR / 'app/client.log'
 
 init_str = '---------------INIT---------------\n'
 
-def make_log_message(level, extra_msg):
-    return f'{str(datetime.today())} [{level}] {extra_msg}'
+def make_log_message(lvl, extra_msg):
+    return f'{str(datetime.today())} [{lvl}] {extra_msg}'
 
 def log(lvl, msg):
     """

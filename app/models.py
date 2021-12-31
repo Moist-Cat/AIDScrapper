@@ -169,7 +169,7 @@ class AIDSObject(ABC, dict):
 
     @abstractmethod
     def _validators(self) -> List[Any]:
-        """To properly initialize validators when they are needed - not before.
+        """To properly initialize validators when they are needed -- not before.
         This is the class you must override if you want to add more validators."""
         self.validators: List[Any] = []
         return self.validators

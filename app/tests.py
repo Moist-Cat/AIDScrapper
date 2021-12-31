@@ -30,6 +30,7 @@ class TestModel(unittest.TestCase):
 
     def test_story_validation(self):
         for story in self.stor_in:
+            # It cannot raise a validation error
             self.stories.add(story)
             self.assertEqual(
                 story['actions'],
@@ -38,6 +39,7 @@ class TestModel(unittest.TestCase):
 
     def test_scenario_validation(self):
         for scenario in self.scen_in:
+            # It cannot raise a validation error
             self.scenarios.add(scenario)
             self.assertEqual(
                 scenario['prompt'],
@@ -298,19 +300,17 @@ class TestHtmlFiles(unittest.TestCase):
     def test_subscen_properly_structured(self):
         alltohtml(TEST_DIR, scenario_outfile='Family.json')
         # just check the path
-        with open(f'{TEST_DIR}/scenarios/Family Matters/Mom/Royal Duty(Mom).html', 'r') as file: pass
+        with open(f'{TEST_DIR}/scenarios/Family Matters/Mom/Duty Calls(Mom).html', 'r') as file: pass
         # check the files one by one
         with open(f'{TEST_DIR}/scen_index.html') as file:
             html = bs(file.read(), 'html5lib')
-            html.a.attrs['href'] = "scenarios/Family Matters.html"
+            assert html.a.attrs['href'] == "scenarios/Family Matters.html"
         with open(f'{TEST_DIR}/scenarios/Family Matters.html') as file:
             html = bs(file.read(), 'html5lib')
-            html.a.attrs['href'] = "scenarios/Family Matters/Mom.html"
+            assert html.a.attrs['href'] == "Family Matters/Mom.html"
         with open(f'{TEST_DIR}/scenarios/Family Matters/Mom.html') as file:
             html = bs(file.read(), 'html5lib')
-            html.a.attrs['href'] = "scenarios/Family Matters/Mom/Royal Duty(Mom).html"
-        
-        href="scenarios/Family Matters.html"
+            assert html.a.attrs['href'] == "Mom/Duty Calls(Mom).html"
 
 def run():
     unittest.main(verbosity=5)

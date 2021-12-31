@@ -48,7 +48,7 @@ def check_errors(request):
                 except KeyError:
                     # 
                     errors = response.json()
-                raw_response = response.content[:20] if len(response.content) > 50 else response.content
+                raw_response = response.content[:50] if len(response.content) > 50 else response.content
                 try:
                     payload = kwargs['data']
                 except KeyError:
@@ -91,13 +91,11 @@ class BaseClient:
         settings.headers.update(self.headers.generate())
 
         self.session.headers.update(settings.headers)
-        self._initial_logging()
+
+        log('init', f'{self.__class__.__name__} successfully initialized.')
 
     def __del__(self):
         self.session.close()
-
-    def _initial_logging(self):
-        log('init', f'{self.__class__.__name__} successfully initialized.')
 
     def quit(self):
         """
@@ -167,7 +165,7 @@ class AIDScrapper(BaseClient):
                 username = settings.get_secret('AID_USERNAME')
                 password = settings.get_secret('AID_PASSWORD')
             except settings.ImproperlyConfigured:
-                username = input('Your username or e-mail: ')
+                username = input('Your username or e-mail: ').strip()
                 password = getpass.getpass('Your password: ')
             finally:
                 credentials = {
@@ -443,7 +441,7 @@ class HoloClient(BaseClient):
         # we need to get the cookies to interact with the API
         self.session.get(self.base_url)
         if credentials:
-            #TODO
+            # TODO
             raise NotImplementedError
         assert self.session.cookies
 

@@ -24,22 +24,20 @@ def get_command(argv: List[str] = sys.argv[1:]):
     )
     
     cmd = parser.parse_args(argv)
-    args = {
-        'title': cmd.title,
-        'actions': cmd.actions
-    }
 
+
+    # (TODO) I have to figure out a way to call the commands without using black magic.
     if cmd.platform:
         # to match class names
         cmd.platform = cmd.platform.lower().capitalize()
-        # listcomp to discover which args we must give to the function
         try:
-            required_args = [
-                args[arg]
-                for arg in command_arg_dict[cmd.platform][cmd.command] if arg in tuple(args.keys())
-            ]
+            args = command_arg_dict[cmd.platform][cmd.command]
+            required_args = {
+                'title': cmd.title,
+                'actions': cmd.actions
+            }.get(args)
         except KeyError:
-            print('Unrecognized command')
+            print('Unrecognized command.')
             return
 
         try:
@@ -47,7 +45,7 @@ def get_command(argv: List[str] = sys.argv[1:]):
             platform = getattr(commands, cmd.platform)()
             command = getattr(platform, cmd.command)
         except AttributeError:
-            print('Unrecognized command. Did you forget to add the -p flag?')
+            print('Unrecognized command. Are you using a command meant for other platform?')
             return
         command(*required_args)
 
@@ -55,7 +53,7 @@ def get_command(argv: List[str] = sys.argv[1:]):
         try:
             main_command = getattr(commands, cmd.command)
         except AttributeError:
-            print(f'{cmd.command} is not a valid command')
+            print(f'{cmd.command} is not a valid command. Did you forget to add the -p flag?')
         else:
             # to the date, all other commands do not require args
             main_command()

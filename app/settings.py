@@ -1,7 +1,6 @@
 import os
 from pathlib import Path
 import json
-import warnings
 
 class ImproperlyConfigured(Exception):
     pass
@@ -9,13 +8,12 @@ class ImproperlyConfigured(Exception):
 DEACTIVATE_LOG = 0
 
 # notice that '' is a catch-all. This does not 
-# include Untitled scenarios, though.
+# include Untitled scenarios due the data validation
+# performed to the models.
 DEFAULT_TITLE = ''
 DEFAULT_MIN_ACT = 10
 
-# base path
-# could be changed to cwd() to use this module from console after
-# a pip install.
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
@@ -24,7 +22,7 @@ try:
 except FileExistsError:
     pass
 
-WARNINGS = 1
+WARNINGS = True
 
 # secrets
 secrets_form = {
@@ -57,9 +55,6 @@ headers = {
             'User-Agent':'Mozilla/5.0 (X11; Fedora; Linux x86_64) ' \
                          'AppleWebKit/537.36 (KHTML, like Gecko) ' \
                          'Chrome/90.0.4430.93 Safari/537.36',
-            'Referer': 'https://play.aidungeon.io/',
-            'Origin': 'https://play.aidungeon.io',
-            'Host': 'api.aidungeon.io',
             'DNT': '1',
             'Accept-Language': 'en-US,en;q=0.9',
             'content-type': 'application/json'
