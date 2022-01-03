@@ -1,63 +1,34 @@
-import sys
-import os
-from datetime import datetime
+import functools
+import logging
+import logging.config
+from typing import List, Callable, Type
 
-from aids.app.settings import BASE_DIR, DEACTIVATE_LOG
+from aids.app.settings import LOGGERS
 
+logging.config.dictConfig(LOGGERS)
 
-# default is linux console.
-ERROR_FILE =  BASE_DIR / 'app/client.error' # '/dev/stdout'
-LOG_FILE = '/dev/stdout' #BASE_DIR / 'app/client.log'
+def logged(methods: List[str] = None) -> Callable:
+    """Decorator to log certain methods of each class while giving
+    each clas its own logger."""
+    def log_class(cls) -> Type:
+        cls.logger = logging.getLogger("user_info." + cls.__qualname__)
+        cls.logger_err = logging.getLogger("audit." + cls.__qualname__)
 
+        def log_method(method):
 
-init_str = '---------------INIT---------------\n'
+            @functools.wraps(method)
+            def wrapper(cls, *args, **kwargs) -> Callable:
+                cls.logger.info("Starting method...")
 
-def make_log_message(lvl, extra_msg):
-    return f'{str(datetime.today())} [{lvl}] {extra_msg}'
+                ret_val = method(cls, *args, **kwargs)
 
-def log(lvl, msg):
-    """
-    Logs a message in whatever file is the current default.
-    """
-    if DEACTIVATE_LOG:
-        return
+                cls.logger.info("Concluding method...")
 
-    if lvl == 'init':
-        msg = init_str + msg
+                return ret_val
+            return wrapper
 
-    if sys.platform == 'linux':
-        try:
-            if os.stat(LOG_FILE).st_size > 5000000:
-                os.system(f'mv {LOG_FILE} {BASE_DIR / "old_logs"}')
-                with open(LOG_FILE, 'w'): pass
-        except TypeError:
-            # console
-            pass
-
-        try:
-            with open(LOG_FILE, 'a') as log_file:
-                log_file.write(make_log_message(lvl, msg) + '\n')
-        except OSError:
-            pass
-    else:
-        # On windows simply print the message
-        print(make_log_message(lvl, msg) + '\n')
-
-def log_error(lvl, msg):
-    """
-    Logs an error in whatever file is the current default.
-    """
-    if DEACTIVATE_LOG:
-        return
-    # bigger than 1 mb
-    if sys.platform == 'linux':
-        try:
-            if os.stat(ERROR_FILE).st_size > 5000000:
-                os.system(f'mv {ERROR_FILE} {BASE_DIR / "old_errors"}')
-        except TypeError:
-            # console
-            pass
-        with open(ERROR_FILE, 'a') as error_file:
-            error_file.write(make_log_message(lvl, msg) + '\n')
-    else:
-        print(make_log_message(lvl, msg) + '\n')
+        for method in methods:
+            # Here we decorate every method listen in the "methods" argument.
+            setattr(cls, method, log_method(getattr(cls, method)))
+        return cls
+    return log_class

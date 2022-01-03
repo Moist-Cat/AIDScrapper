@@ -1,17 +1,15 @@
 import os
 import glob
 from pathlib import Path
-# import traceback
 from abc import ABC, abstractmethod
 from collections.abc import MutableMapping
 import json
 # Compatibility with Windows -- we can not add : to the path there
 import uuid
-import sys
 
 from typing import Any, List, Dict
 
-from aids.app.writelogs import log_error, log
+from aids.app.writelogs import logged
 from aids.app import settings
 from aids.app.schemes import AIDStoryScheme, AIDScenScheme, NAIScenScheme
 
@@ -26,7 +24,7 @@ class FieldValueIs:
         self.value = value
 
     def validate(self, data):
-        if self.value and data[self.field] != self.value and not ("isOption" in data): # ignore subscens
+        if self.value and data[self.field] != self.value and "isOption" not in data: # ignore subscens
             raise ValidationError(
                 f"Invalid {self.field}. It should have been "
                 f"{self.value} got {data[self.field]}"
@@ -57,18 +55,19 @@ class FieldNotBlank:
             if not data[field] and not ("options" in data and any(data["options"])):
                 raise ValidationError(f"{field} can not be blank")
 
-
+@logged([])
 class AIDSObject(ABC, dict):
     """Base aids object Container class from where all other containers
     must inherit. It ineriths from the dict builtin object so it behaves pretty much
-    like one - except with the fact that data should be passed to the add method for
-    validation.
+    like one -- except with the fact that data should be passed to the add method to 
+    properly form the keys.
     """
 
     data: Dict
     validators: List
 
     def __init__(self):
+        super().__init__()
 
         # notice that - unlike the backup path - this one is relative
         # using the module via commands from another directory will dump
@@ -85,25 +84,16 @@ class AIDSObject(ABC, dict):
     def __len__(self):
         return len(self.keys())
 
-    def __iter__(self):
-        return super().__iter__()
-
-    def __getitem__(self, key):
-        return super().__getitem__(key)
-
     def __setitem__(self, key, value):
         self.data.update(value)
         try:
             for validator in self._validators:
                 validator.validate(self.data)
-        except ValidationError:
-            raise
+        except ValidationError as exc:
+            raise ValidationError from exc
         else:
             self.clean_titles(self.data)
             super().__setitem__(key, self.data.copy())
-
-    def __delitem__(self, key):
-        super().__delitem__(key)
     
     def update(self, other=(), /, **kwds):
         """For some reason, the builtin dict.update method
@@ -140,7 +130,11 @@ class AIDSObject(ABC, dict):
                 if len(self) < 2
                 else list(self.keys())
             )
-            log_error("error", f"Error while dumping the data. Validated data: {validated_data}")
+            self.logger_err.error(
+                "Error while dumping the data. Validated data: %s",
+                validated_data
+            )
+        self.logger.info("Dumped all data to %s", self.default_json_file)
 
     def load(self):
         """Load data form a json file.
@@ -148,9 +142,9 @@ class AIDSObject(ABC, dict):
         try:
             with open(self.default_json_file) as file:
                 raw_data = json.load(file)
-            log(
-                 "log",
-                f"Loading data... {len(raw_data)} objects found, proceeding to validate."
+            self.logger.info(
+                f"Loading data... %d objects found, proceeding to validate.",
+                len(raw_data)
             )
             if not isinstance(raw_data, List):
                 raise TypeError(
@@ -161,12 +155,13 @@ class AIDSObject(ABC, dict):
             for scenario in raw_data:
                 self.add(scenario)
         except json.decoder.JSONDecodeError:
-            log_error(
-                 "error",
-                f"Error while loading the data. {file.name} does not contain valid JSON."
+            self.logger_err.error(
+                f"Error while loading the data. %s does not contain valid JSON.",
+                file.name
             )
-        log("log", f"{len(self)} objects loaded from the {file.name}")
+        self.logger.info("%d objects loaded from the %s", len(self), file.name)
 
+    @property
     @abstractmethod
     def _validators(self) -> List[Any]:
         """To properly initialize validators when they are needed -- not before.
@@ -282,4 +277,4 @@ class NAIScenario(BaseScenario):
                 ) as file:
                     json.dump(scenario, file)
             except json.decoder.JSONDecodeError:
-                log_error("error", f"Error while dumping the data. Validated data: {scenario}")
+                self.logger_err.error("Error while dumping the data. Validated data: %s", scenario)

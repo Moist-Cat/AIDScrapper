@@ -13,7 +13,11 @@ __pycache__/
 # backups
 backups/*
 !/backups/.gitkeep
+*~
 
 #logs
 client.error
+client.error.1
 client.log
+client.log.1
+

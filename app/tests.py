@@ -168,6 +168,7 @@ class TestReformatters(unittest.TestCase):
             for s in json.load(scen):
                 if s['title'] == 'Snowed In':
                    out_f = s
+                   break
 
         try:
             map(
@@ -268,7 +269,7 @@ class TestHtmlFiles(unittest.TestCase):
                 # we got the story we were looking for.
                 break
         else:
-            raise AssertionError('The story is not even there. Check the other tests.')
+            raise AssertionError('The story is not even there.')
 
         self.assert_if_exists(body, story['title'])
         self.assert_if_exists(body, story['description'])

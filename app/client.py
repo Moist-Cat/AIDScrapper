@@ -2,9 +2,6 @@ import json
 import getpass
 from typing import Sequence, List, Dict
 import time
-import traceback
-import random
-import re
 import requests
 
 try:
@@ -19,8 +16,8 @@ except:
 from fake_headers import Headers
 
 from aids.app.models import Story, Scenario, ValidationError
-from aids.app.writelogs import log_error, log
-from aids.app import settings, writelogs, schemes
+from aids.app.writelogs import logged
+from aids.app import settings, schemes
 
 def check_errors(request):
     def inner_func(cls, method, url, **kwargs):
@@ -31,16 +28,15 @@ def check_errors(request):
                 response.raise_for_status()
             except (
                     requests.exceptions.ConnectionError, requests.exceptions.SSLError
-            ):
-                with open(writelogs.ERROR_FILE, 'a') as error:
-                    traceback.print_exc(file=error)
+            ) as exc:
+                cls.logger_err.exception(exc)
 
-                log('log', 'Something went wrong. Retrying...')
-                log_error(
-                    'fatal',
-                    f'Server URL: {url}), failed while trying to connect.'
+                cls.logger.info('Network unstable. Retrying...')
+                cls.logger_err.error(
+                    f'Server URL: %s, failed while trying to connect.',
+                    url
                 )
-            except requests.exceptions.HTTPError:
+            except requests.exceptions.HTTPError as exc:
                 try:
                     errors = response.json()['errors']
                 except json.decoder.JSONDecodeError:
@@ -53,22 +49,22 @@ def check_errors(request):
                     payload = kwargs['data']
                 except KeyError:
                     payload = 'none'
-                error_message = (
-                    'crit',
-                    f'Server URL: {response.url}, ' \
-                    f'failed with status code ({response.status_code}). ' \
-                    f'Errors: {errors}. ' \
-                    f'Raw response: {raw_response}' \
-                    f'Request payload: {payload}'
-                )
-                log_error(*error_message)
-                raise
+                error_message = f"""
+                    Server URL: {response.url}, 
+                    failed with status code ({response.status_code}).
+                    Errors: {errors}. 
+                    Raw response: {raw_response} 
+                    Request payload: {payload}
+                """
+                cls.logger.error(error_message)
+                raise requests.exceptions.HTTPError from exc
             else:
                 request_success = True
             #time.sleep(3)
         return response
     return inner_func
 
+@logged([])
 class Session(requests.Session):
     """
     Overrriden version of requests.Session that checks for errors
@@ -79,6 +75,7 @@ class Session(requests.Session):
     def request(self, method, url, **kwargs):
         return super().request(method, url, **kwargs)
 
+@logged([])
 class BaseClient:
     """
     Base client from where all other clients must inherit.
@@ -92,7 +89,7 @@ class BaseClient:
 
         self.session.headers.update(settings.headers)
 
-        log('init', f'{self.__class__.__name__} successfully initialized.')
+        self.logger.info(f'%s successfully initialized.', self.__class__.__name__)
 
     def __del__(self):
         self.session.close()
@@ -113,9 +110,10 @@ class BaseClient:
         try:
             renew_connection()
         except stem.SocketError:
-            log_error('crit', 'Socket Error: '\
+            self.logger_err.error('Socket Error: '\
                 'The Tor service is not up. Unable to continue.'
             )
+            # (XXX) Shouldn't I re-raise the exception?
         self.session = get_tor_session(self.session)
 
     def login(self, credentials: dict):
@@ -131,7 +129,7 @@ class BaseClient:
         """
         self.session.headers = settings.headers
         self.session.cookies.clear()
-        log('log', 'logged out')
+        self.logger.info('logged out')
 
 class AIDScrapper(BaseClient):
     """
@@ -176,7 +174,7 @@ class AIDScrapper(BaseClient):
         key = self.get_login_token(credentials)
 
         self.session.headers.update({'x-access-token': key})
-        log('log', f'User \"{username}\" sucessfully logged into AID')
+        self.logger.info('User \"%s\" sucessfully logged into AID', username)
 
     def _get_story_content(self, story_id: str) -> dict:
         self.story_query.update({"variables": {"publicId": story_id}})
@@ -223,11 +221,11 @@ class AIDScrapper(BaseClient):
                         
                     else:
                         self.adventures.add(s)
-                    log("log", f"Loaded story: \"{story['title']}\"")
-                log('debug', f'Got {len(self.adventures)} stories so far')
+                    self.logger.info("Loaded story: \"%s\"", story["title"])
+                self.logger.debug('Got %d stories so far', len(self.adventures))
                 self.stories_query['variables']['input']['offset'] = self.offset
             else:
-                log('log', 'All stories downloaded')
+                self.logger.info('All stories downloaded')
                 break
 
     def get_scenarios(self) -> List[Dict]:
@@ -237,12 +235,12 @@ class AIDScrapper(BaseClient):
             if any(result):
                 for scenario in result:
                     self.add_all_scenarios(scenario["publicId"])
-                log('debug', f'Got {len(self.prompts)} scenarios so far')
+                self.logger.debug('Got %d scenarios so far', len(self.prompts))
                 self.scenarios_query['variables'] \
                                     ['input'] \
                                     ['offset'] = self.offset
             else:
-                log('log', 'All scenarios downloaded')
+                self.logger.info('All scenarios downloaded')
                 self.offset = 0
                 break
 
@@ -259,7 +257,7 @@ class AIDScrapper(BaseClient):
                 )        
         self.prompts.add(scenario)
         self.offset += 1 if not isOption else 0
-        log("log", f"Added {scenario['title']} to memory")
+        self.logger.info(f"Added %s to memory", scenario['title'])
 
     def get_login_token(self, credentials: dict):
         self.aid_loginpayload['variables']['identifier'] = \
@@ -273,7 +271,7 @@ class AIDScrapper(BaseClient):
         ).json()
         if 'data' in res:
             return res['data']['login']['accessToken']
-        log_error('crit', 'There was no data')
+        self.logger_err.error('There was no data')
         return None
 
     def upload_in_bulk(self, scenarios: Dict[str, Dict]):
@@ -293,7 +291,7 @@ class AIDScrapper(BaseClient):
                 self.url,
                 data=json.dumps(new_scenario)
             )
-            log('log', f'{scenario["title"]} successfully uploaded...')
+            self.logger.info('%s successfully uploaded...', scenario["title"])
 
 
 class ClubClient(BaseClient):
