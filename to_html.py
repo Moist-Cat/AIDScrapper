@@ -46,7 +46,7 @@ class toHtml:
                 self.out_path /
                 f'stories/{story["title"]}{story_number[story["title"]]}.html'
             ):
-                htmlfile = open(self.out_path / f'stories/{story["title"]}.html', 'w')
+                htmlfile = open(self.out_path / f'stories/{story["title"]}.html', 'w', encoding='utf-8')
             else:
                 # story from same scenario
                 if story_number[story["title"]]:
@@ -54,14 +54,16 @@ class toHtml:
                     htmlfile = open(
                         self.out_path /
                         f'stories/{story["title"]}{story_number[story["title"]]}.html',
-                        'w'
+                        'w',
+                        encoding='utf-8'
                     )
                 else:
                     story_number[story["title"]] = 2
                     htmlfile = open(
                         self.out_path /
                         f'stories/{story["title"]}{story_number[story["title"]]}.html',
-                        'w'
+                        'w',
+                        encoding='utf-8'
                     )
             htmlfile.write(
                 story_templ.render({
