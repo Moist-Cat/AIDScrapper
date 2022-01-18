@@ -32,10 +32,8 @@ def get_command(argv: List[str] = sys.argv[1:]):
         cmd.platform = cmd.platform.lower().capitalize()
         try:
             args = command_arg_dict[cmd.platform][cmd.command]
-            required_args = {
-                'title': cmd.title,
-                'actions': cmd.actions
-            }.get(args)
+            required_args = [{'title': cmd.title, 'actions': cmd.actions}.get(arg) for arg in args]
+
         except KeyError:
             print('Unrecognized command.')
             return

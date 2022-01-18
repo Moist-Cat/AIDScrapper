@@ -178,8 +178,11 @@ class AIDSObject(ABC, dict):
         """
         assert "title" in data
         try:
-            data["title"] = data["title"].replace("/", "-").replace("\\", "-")
-        except KeyError:
+            if data["title"]:
+                data["title"] = data["title"].replace("/", "-").replace("\\", "-")
+            else:
+                data["title"] = "Untitled"
+        except (KeyError, AttributeError):
             data["title"] = "Untitled"
         if "options" in data:
             for option in data["options"]:
@@ -201,10 +204,7 @@ class BaseScenario(AIDSObject):
 
     def _add(self, value: dict):
         key = value['title']
-        try:
-            self.__setitem__(key, value)
-        except ValidationError:
-            pass
+        self.__setitem__(key, value)
 
     def _validators(self):
         self.validators = [
@@ -237,10 +237,7 @@ class BaseStory(AIDSObject):
             value['title'],
             len(eval('value' + self.action_field))
         )
-        try:
-            self.__setitem__(key, value)
-        except ValidationError:
-            pass
+        self.__setitem__(key, value)
 
     def _validators(self):
         self.validators = [
