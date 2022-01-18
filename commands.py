@@ -12,7 +12,7 @@ except ImportError:
 
 from aids.app.client import AIDScrapper, ClubClient, HoloClient, bs4
 import aids.to_html as to_html
-from aids.app.settings import BASE_DIR, secrets_form
+from aids.app.settings import BASE_DIR, secrets_form, DEBUG
 from aids.app.models import NAIScenario, Scenario
 
 
@@ -130,10 +130,11 @@ def _scenario_to_json(source_files: Union[str, Path]):
         ]
         model.add(json_data.copy())
 
-        print('-------------------------------------')
-        print(f'Your NAI scenario \"{json_data["title"]}\" was successfully ' \
-                're-formatted.')
-        print('-------------------------------------')
+        if DEBUG is False:
+            print('-------------------------------------')
+            print(f'Your NAI scenario \"{json_data["title"]}\" was successfully ' \
+                    're-formatted.')
+            print('-------------------------------------')
     return model
 
 def makenai(
@@ -178,10 +179,11 @@ def _json_to_scenario(source_file: Union[str, Path]) -> 'NAIScenario':
             'lorebook': {'entries': entries.copy()}
         })
         model.add(data_scheme.copy())
-        print('-------------------------------------')
-        print(f'Your AID scenario \"{scenario["title"]}\" was successfully ' \
-                're-formatted.')
-        print('-------------------------------------')
+        if DEBUG is False:
+            print('-------------------------------------')
+            print(f'Your AID scenario \"{scenario["title"]}\" was successfully ' \
+                    're-formatted.')
+            print('-------------------------------------')
 
     return model
 

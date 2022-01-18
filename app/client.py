@@ -1,6 +1,7 @@
+import warnings
 import json
 import getpass
-from typing import Sequence, List, Dict
+from typing import Sequence, List, Dict, Any
 import time
 import requests
 
@@ -11,9 +12,8 @@ except ImportError:
 try:
     import stem
     from aids.app.obfuscate import get_tor_session, renew_connection
-except:
+except ImportError:
     stem = None
-from fake_headers import Headers
 
 from aids.app.models import Story, Scenario, ValidationError
 from aids.app.writelogs import logged
@@ -33,7 +33,7 @@ def check_errors(request):
 
                 cls.logger.info('Network unstable. Retrying...')
                 cls.logger_err.error(
-                    f'Server URL: %s, failed while trying to connect.',
+                    'Server URL: %s, failed while trying to connect.',
                     url
                 )
             except requests.exceptions.HTTPError as exc:
@@ -64,7 +64,7 @@ def check_errors(request):
         return response
     return inner_func
 
-@logged([])
+@logged
 class Session(requests.Session):
     """
     Overrriden version of requests.Session that checks for errors
@@ -75,7 +75,7 @@ class Session(requests.Session):
     def request(self, method, url, **kwargs):
         return super().request(method, url, **kwargs)
 
-@logged([])
+@logged
 class BaseClient:
     """
     Base client from where all other clients must inherit.
@@ -83,13 +83,10 @@ class BaseClient:
     def __init__(self):
         self.url = None
         self.session = Session()
-        self.headers = Headers()
 
-        settings.headers.update(self.headers.generate())
+        self.session.headers.update(settings.get_request_headers())
 
-        self.session.headers.update(settings.headers)
-
-        self.logger.info(f'%s successfully initialized.', self.__class__.__name__)
+        self.logger.info('%s successfully initialized.', self.__class__.__name__)
 
     def __del__(self):
         self.session.close()
@@ -120,16 +117,15 @@ class BaseClient:
         """
         Login into the site using a dict credentials.
         """
-        credentials = credentials or {}
-        return NotImplemented
+        raise NotImplementedError
 
     def logout(self):
         """
         Clean up the session to \"log-out\".
         """
-        self.session.headers = settings.headers
+        self.session.headers = settings.get_request_headers()
         self.session.cookies.clear()
-        self.logger.info('logged out')
+        self.logger.info('Logged out.')
 
 class AIDScrapper(BaseClient):
     """
@@ -160,38 +156,44 @@ class AIDScrapper(BaseClient):
     def login(self, credentials = None):
         if not credentials:
             try:
+                self.logger.info("Trying to log-in via file...")
+
                 username = settings.get_secret('AID_USERNAME')
                 password = settings.get_secret('AID_PASSWORD')
             except settings.ImproperlyConfigured:
+                self.logger.info("File is not configured... logging in via console.")
+
+                warnings.warn("Registering a user is the preferred way of logging in.")
                 username = input('Your username or e-mail: ').strip()
                 password = getpass.getpass('Your password: ')
-            finally:
-                credentials = {
-                    'username': username,
-                    'password': password
-                }
+            credentials = {
+                'username': username,
+                'password': password
+            }
+        else:
+            self.logger.info("Credentials were passed to the function directly...")
 
         key = self.get_login_token(credentials)
 
         self.session.headers.update({'x-access-token': key})
-        self.logger.info('User \"%s\" sucessfully logged into AID', username)
+        self.logger.info('User \"%s\" sucessfully logged into AID', credentials['username'])
 
-    def _get_story_content(self, story_id: str) -> dict:
+    def _get_story_content(self, story_id: str) -> Dict[str, Any]:
         self.story_query.update({"variables": {"publicId": story_id}})
         return self.session.post(self.url, json=self.story_query).json()["data"]["adventure"]
     
-    def _get_scenario_content(self, scenario_id: str) -> dict:
+    def _get_scenario_content(self, scenario_id: str) -> Dict[str, Any]:
         self.scenario_query.update({"variables": {"publicId": scenario_id}})
         wi = self._get_wi(scenario_id)
         scenario = self.session.post(self.url, json=self.scenario_query).json()["data"]["scenario"]
         scenario.update({"worldInfo": wi})
         return scenario
 
-    def _get_wi(self, scenario_id: str) -> dict:
+    def _get_wi(self, scenario_id: str) -> Dict[str, Any]:
         self.wi_query["variables"].update({"contentPublicId": scenario_id})
         return self.session.post(self.url, json=self.wi_query).json()["data"]["worldInfoType"]
 
-    def _get_object(self, query: dict):
+    def _get_object(self, query: dict) -> Dict[str, Any]:
         query['variables']['input']['searchTerm'] = self.adventures.title or self.prompts.title
 
         return self.session.post(
@@ -201,7 +203,7 @@ class AIDScrapper(BaseClient):
             )
         ).json()['data']
 
-    def get_stories(self) -> List[Dict]:
+    def get_stories(self) -> List[Dict[str, Any]]:
         while True:
             result = self._get_object(self.stories_query)['user']['search']
 
@@ -210,12 +212,11 @@ class AIDScrapper(BaseClient):
                     s = self._get_story_content(story["publicId"])
                     self.offset += 1
                     if not self.adventures.title:
-                        # this ensures uniqueness
-                        # it is usually handled by the model but we need
-                        # to handle this exception ourselves
+                        # To optimize queries -- stop when we are under n actions
                         try:
-                            self.adventures[s["title"], len(s["actions"])] = s
-                        except ValidationError:
+                            self.adventures._add(s)
+                        except ValidationError as exc:
+                            self.logger.debug(exc)
                             # actions are under the limit. Abort.
                             return
                         
@@ -228,9 +229,9 @@ class AIDScrapper(BaseClient):
                 self.logger.info('All stories downloaded')
                 break
 
-    def get_scenarios(self) -> List[Dict]:
+    def get_scenarios(self) -> List[Dict[str, Any]]:
         while True:
-            result: List[Dict] = self._get_object(self.scenarios_query)['user']['search']
+            result: List[Dict[str, Any]] = self._get_object(self.scenarios_query)['user']['search']
 
             if any(result):
                 for scenario in result:
@@ -244,10 +245,10 @@ class AIDScrapper(BaseClient):
                 self.offset = 0
                 break
 
-    def add_all_scenarios(self, pubid, isOption=False) -> List[Dict]:
+    def add_all_scenarios(self, pubid, isOption=False) -> List[Dict[str, Any]]:
         """Adds all scenarios and their children to memory"""
 
-        scenario = self._get_scenario_content(pubid)
+        scenario: Dict[str, Any] = self._get_scenario_content(pubid)
         scenario["isOption"] = isOption
 
         if "options" in scenario and isinstance(scenario["options"], Sequence):
@@ -257,9 +258,9 @@ class AIDScrapper(BaseClient):
                 )        
         self.prompts.add(scenario)
         self.offset += 1 if not isOption else 0
-        self.logger.info(f"Added %s to memory", scenario['title'])
+        self.logger.info("Added %s to memory", scenario['title'])
 
-    def get_login_token(self, credentials: dict):
+    def get_login_token(self, credentials: Dict[str, Any]):
         self.aid_loginpayload['variables']['identifier'] = \
             self.aid_loginpayload['variables']['email'] = credentials['username']
         self.aid_loginpayload['variables']['password'] = credentials['password']
@@ -270,22 +271,35 @@ class AIDScrapper(BaseClient):
             )
         ).json()
         if 'data' in res:
-            return res['data']['login']['accessToken']
+            try:
+                token = res['data']['login']['accessToken']
+            except KeyError as exc:
+                raise (KeyError("There was no token")) from exc
+
+            assert token
+
+            return token
         self.logger_err.error('There was no data')
         return None
 
-    def upload_in_bulk(self, scenarios: Dict[str, Dict]):
+    def upload_in_bulk(self, scenarios: Dict[str, Any]):
         for key in scenarios:
             scenario = scenarios[key]
             
             assert isinstance(scenario, dict)
+
             res = self.session.post(self.url,
                 data=json.dumps(self.create_scen_payload)
             ).json()['data']['createScenario']
             scenario.update({'publicId': res['publicId']})
             new_scenario = self.update_scen_payload.copy()
 
+
+            # (XXX) This process have been delegated to the
+            # data models. Maybe wait for me to make a proper "Scenario" object 
+            # to refactor it?
             clean_scenario = {k: v for k, v in scenario.items() if k in new_scenario['variables']['input']}
+
             new_scenario.update({'variables': {'input': clean_scenario}})
             self.session.post(
                 self.url,
@@ -298,11 +312,15 @@ class ClubClient(BaseClient):
 
     def __init__(self):
         super().__init__()
+        warnings.warn(
+            "The Club Client is should be out of service due to "\
+            "changes in aidg.club.com back-end."
+        )
 
         self.url = 'https://prompts.aidg.club/'
 
         if not bs4:
-            raise ImportError('You must pip install bs4 to use the club client.')
+            raise ImportError('You must install the BeautifulSoup library to use the Club client.')
 
     def _post(self, obj_url, params):
         url = self.url + obj_url
@@ -447,7 +465,7 @@ class HoloClient(BaseClient):
         res = self.session.post(self.url + 'create_story')
         return res.json()['story_id']
 
-    def generate_output(self, context: dict = None):
+    def generate_output(self, context: Dict[str, Any] = None):
         if not self.curr_story_id:
             self.curr_story_id = self.create_scenario()
 

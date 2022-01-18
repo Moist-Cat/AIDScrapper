@@ -2,11 +2,14 @@ import os
 import glob
 import json
 import unittest
+import unittest.mock
 from unittest import skip
 
+import requests
 from bs4 import BeautifulSoup as bs
 
-from aids.app.settings import BASE_DIR
+import aids.app.client
+from aids.app.settings import BASE_DIR, ImproperlyConfigured
 from aids.app.client import AIDScrapper
 from aids.app.models import Story, Scenario, ValidationError
 from aids.app.schemes import FrozenKeyDict
@@ -25,8 +28,6 @@ class TestModel(unittest.TestCase):
         self.scenarios = Scenario()
         with open(TEST_DIR / 'test_scen.json') as file:
             self.scen_in = json.load(file)
-    def tearDown(self):
-        pass
 
     def test_story_validation(self):
         for story in self.stor_in:
@@ -167,8 +168,8 @@ class TestReformatters(unittest.TestCase):
         with open(self.scenario_outfile) as scen:
             for s in json.load(scen):
                 if s['title'] == 'Snowed In':
-                   out_f = s
-                   break
+                    out_f = s
+                    break
 
         try:
             map(
@@ -178,33 +179,65 @@ class TestReformatters(unittest.TestCase):
                     in_f[0]['memory']
                 ), out_f.values()
             )
-        except UnboundLocalError:
+        except UnboundLocalError as exc:
             raise AssertionError(
                 'The scenario was not in the file. Possibly because the same reference' \
                 'for an object was used and, when changed, updated all other objects. Use .copy()' \
                 'to avoid this.'
-            )
+            ) from exc
         
         makenai(self.json_infile, TEST_DIR)
         
         assert len(glob.glob(str(TEST_DIR / '*.scenario'))) > 60
 
-@skip
-class TestDowloadFiles(unittest.TestCase):
+# Schizo test cases to mock API calls so everything can be tested without 
+# relying on their server
+class TestLogin(unittest.TestCase):
 
     def setUp(self):
+
         self.client = AIDScrapper()
-        self.client.prompts('Test')
-        self.client.adventures.title('Test', 0)
-        # you better have configured your secrets.json file.
+        self.client.session.get = unittest.mock.Mock
+        self.client.session.post = unittest.mock.Mock
+
+        self.client.session.post.json = lambda cls: {"data": {"login": {"accessToken": "dummyToken"}}}
+
+    def test_get_login_token(self):
+        
+        token = self.client.get_login_token({"username": "dummy", "password": "dummypass"})
+
+        self.assertEqual(token, "dummyToken")
+
+    def test_regular_login(self):
+        aids.app.client.settings.get_secret = lambda string: "dummy"
+
         self.client.login()
 
-    def tearDown(self):
-        self.client.logout()
+        self.client.session.headers["x-access-token"] == "dummyToken"
 
-    def test_download(self):
-        assert self.client.get_scenarios()
-        assert self.client.get_stories()
+    def test_console_login(self):
+        aids.app.client.__builtins__["input"] = lambda string: "dummy"
+        aids.app.client.getpass.getpass = lambda string: "dummypass"
+
+        aids.app.client.settings.get_secret = lambda string: exec("raise ImproperlyConfigured")
+
+        self.client.login()
+
+        self.client.session.headers["x-access-token"] == "dummyToken"
+
+    def test_direct_login(self):
+        self.client.login({"username": "dummy", "password": "dummypass"})
+
+class ClientGetStories(unittest.TestCase):
+    def setUp(self):
+
+        self.client = AIDScrapper()
+        self.client.session.get = unittest.mock.Mock
+        self.client.session.post = unittest.mock.Mock
+
+
+
+
 
 class TestHtmlFiles(unittest.TestCase):
 
@@ -276,7 +309,7 @@ class TestHtmlFiles(unittest.TestCase):
         self.assert_if_exists(body, story['authorsNote'])
         self.assert_if_exists(body, story['memory'])
 
-        # all the actions were in a span, we get them all
+        # all the actions are in a span, we get them all
         html_actions = html.findAll('span')
         assert html_actions
         matches = 0

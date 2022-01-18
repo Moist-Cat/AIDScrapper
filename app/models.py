@@ -4,7 +4,6 @@ from pathlib import Path
 from abc import ABC, abstractmethod
 from collections.abc import MutableMapping
 import json
-# Compatibility with Windows -- we can not add : to the path there
 import uuid
 
 from typing import Any, List, Dict
@@ -55,7 +54,7 @@ class FieldNotBlank:
             if not data[field] and not ("options" in data and any(data["options"])):
                 raise ValidationError(f"{field} can not be blank")
 
-@logged([])
+@logged
 class AIDSObject(ABC, dict):
     """Base aids object Container class from where all other containers
     must inherit. It ineriths from the dict builtin object so it behaves pretty much
@@ -77,7 +76,7 @@ class AIDSObject(ABC, dict):
         self.default_scenario_path = Path().cwd()
         self.unique_indendifier = str(uuid.uuid4())
         self.default_backups_file = (
-            BASE_DIR / f"backups" /
+            BASE_DIR / "backups" /
             f"{self.__class__.__name__.lower()}_{self.unique_indendifier}.json"
         )
 
@@ -86,29 +85,33 @@ class AIDSObject(ABC, dict):
 
     def __setitem__(self, key, value):
         self.data.update(value)
+        self.clean_titles(self.data)
         try:
-            for validator in self._validators:
+            for validator in self._validators():
                 validator.validate(self.data)
         except ValidationError as exc:
             raise ValidationError from exc
         else:
-            self.clean_titles(self.data)
             super().__setitem__(key, self.data.copy())
     
     def update(self, other=(), /, **kwds):
-        """For some reason, the builtin dict.update method
-        does not use __setattr__ therefore we must use MutableMapping.update
-        """
+        # The builtin dict.update method
+        # does not use __setattr__ (because it is implemented in C) 
+        # therefore we must use MutableMapping.update
         MutableMapping.update(self, other, **kwds)
 
     # --- core ---
     @abstractmethod
+    def _add(self, value: dict):
+        """This saves the object with a proper key. Letting the Validation error raise."""
+        raise NotImplementedError
+        
+
     def add(self, value: dict):
         """This handles the exception that __setitem__ could raise.
         """
-        key = value['uuid']
         try:
-            self.__setitem__(key, value)
+            self._add(value)
         except ValidationError:
             pass
 
@@ -143,7 +146,7 @@ class AIDSObject(ABC, dict):
             with open(self.default_json_file) as file:
                 raw_data = json.load(file)
             self.logger.info(
-                f"Loading data... %d objects found, proceeding to validate.",
+                "Loading data... %d objects found, proceeding to validate.",
                 len(raw_data)
             )
             if not isinstance(raw_data, List):
@@ -156,12 +159,11 @@ class AIDSObject(ABC, dict):
                 self.add(scenario)
         except json.decoder.JSONDecodeError:
             self.logger_err.error(
-                f"Error while loading the data. %s does not contain valid JSON.",
+                "Error while loading the data. %s does not contain valid JSON.",
                 file.name
             )
         self.logger.info("%d objects loaded from the %s", len(self), file.name)
 
-    @property
     @abstractmethod
     def _validators(self) -> List[Any]:
         """To properly initialize validators when they are needed -- not before.
@@ -185,7 +187,8 @@ class AIDSObject(ABC, dict):
         return data
 
 class BaseScenario(AIDSObject):
-    """Base Scenario object.
+    """
+    Base Scenario object.
     """
 
     def __init__(self, title: str = ""):
@@ -196,16 +199,13 @@ class BaseScenario(AIDSObject):
     def __call__(self, title):
         self.title = title
 
-    def add(self, value: dict):
-        """This handles the exception that __setitem__ could raise.
-        """
+    def _add(self, value: dict):
         key = value['title']
         try:
             self.__setitem__(key, value)
         except ValidationError:
             pass
 
-    @property
     def _validators(self):
         self.validators = [
             FieldValueIs('title', self.title),
@@ -214,10 +214,12 @@ class BaseScenario(AIDSObject):
         return self.validators
 
 class BaseStory(AIDSObject):
-    """Base story object. The action_field attribute is
-    a string that is meant to be passed to eval to get the action
-    objects.
     """
+    Base story object.
+    """
+    # The action_field attribute is 
+    # a string that is meant to be passed to eval to get the action
+    # objects from the data.
     action_field: str = '[\"actions\"]'
 
     def __init__(self, title: str = "", actions: int = 0):
@@ -230,9 +232,7 @@ class BaseStory(AIDSObject):
         self.title = title
         self.actions = actions
 
-    def add(self, value: dict):
-        """This handles the exception that __setitem__ could raise.
-        """
+    def _add(self, value: dict):
         key = (
             value['title'],
             len(eval('value' + self.action_field))
@@ -242,7 +242,6 @@ class BaseStory(AIDSObject):
         except ValidationError:
             pass
 
-    @property
     def _validators(self):
         self.validators = [
             FieldValueIs('title', self.title),
@@ -269,6 +268,7 @@ class NAIScenario(BaseScenario):
     
     def dump_single_files(self):
         for scenario in self.values():
+            scenario = self.clean_titles(scenario)
             try:
                 with open(
                     self.default_scenario_path /
