@@ -7,6 +7,7 @@ from aids.app.settings import LOGGERS
 
 logging.config.dictConfig(LOGGERS)
 
+
 def logged(cls) -> Callable:
     """Decorator to log certain methods of each class while giving
     each clas its own logger."""

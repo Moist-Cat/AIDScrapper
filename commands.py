@@ -17,17 +17,16 @@ from aids.app.models import NAIScenario, Scenario
 
 
 command_arg_dict = {
-    'Aid': {
-        'stories': ('title', 'actions'),
-        'scenarios': ('title',),
-        'all': ('title', 'actions'),
-        'fenix': ()
+    "Aid": {
+        "stories": ("title", "actions"),
+        "scenarios": ("title",),
+        "all": ("title", "actions"),
+        "fenix": (),
     },
-    'Club':{
-        'publish': ('title',)
-    },
-    'Holo': {},
+    "Club": {"publish": ("title",)},
+    "Holo": {},
 }
+
 
 class Aid(AIDScrapper):
     def __init__(self):
@@ -63,8 +62,10 @@ class Aid(AIDScrapper):
             self.prompts.dump()
         self.upload_in_bulk(self.prompts)
 
+
 class Holo(HoloClient):
     pass
+
 
 class Club(ClubClient):
     def publish(self, title):
@@ -75,40 +76,43 @@ class Club(ClubClient):
                 await_completition = False
             else:
                 selection = input(
-                    'bs4 not installed, unable to continue... want to install it now?' \
-                    '(Enter to install bs4)'
+                    "bs4 not installed, unable to continue... want to install it now?"
+                    "(Enter to install bs4)"
                 )
                 if not selection:
-                    os.system('pip3 install bs4')
+                    os.system("pip3 install bs4")
                 else:
                     break
 
-def makejson(source_files: str='*.scenario', target: str=''):
+
+def makejson(source_files: str = "*.scenario", target: str = ""):
     data = _scenario_to_json(source_files)
 
     if target:
         data.default_json_file = target
     data.dump()
 
+
 def _reformat_context(json_data):
     """reformat the context as memory and AN
-    usually, 0 is memory whilst 1 is AN. But as 
+    usually, 0 is memory whilst 1 is AN. But as
     the russians say, \"Trust, but verify\"
     """
-    for data in json_data['context']:
+    for data in json_data["context"]:
         if (
-            not data['contextConfig']['insertionPosition'] or  
-            data['contextConfig']['insertionPosition'] < -4
+            not data["contextConfig"]["insertionPosition"]
+            or data["contextConfig"]["insertionPosition"] < -4
         ):
-            json_data['memory'] = data['text']
+            json_data["memory"] = data["text"]
 
-        elif data['contextConfig']['insertionPosition'] == -4:
-            json_data['authorsNote'] = data['text']
+        elif data["contextConfig"]["insertionPosition"] == -4:
+            json_data["authorsNote"] = data["text"]
 
         else:
             # we can not verify, I guess.
-            json_data['memory'] = json_data['context'][0]['text']
-            json_data['authorsNote'] = json_data['context'][1]['text']
+            json_data["memory"] = json_data["context"][0]["text"]
+            json_data["authorsNote"] = json_data["context"][1]["text"]
+
 
 def _scenario_to_json(source_files: Union[str, Path]):
     nai_file_name = glob.glob(str(source_files))
@@ -122,25 +126,25 @@ def _scenario_to_json(source_files: Union[str, Path]):
         _reformat_context(json_data)
 
         # lorebook to worldInfo is way easier
-        json_data['worldInfo'] = [
-            {
-            'keys': entry['keys'], 'entry': entry['text']
-            } for entry in json_data['lorebook']['entries']
+        json_data["worldInfo"] = [
+            {"keys": entry["keys"], "entry": entry["text"]}
+            for entry in json_data["lorebook"]["entries"]
         ]
         model.add(json_data.copy())
 
         if DEBUG is False:
-            print('-------------------------------------')
-            print(f'Your NAI scenario \"{json_data["title"]}\" was successfully ' \
-                    're-formatted.')
-            print('-------------------------------------')
+            print("-------------------------------------")
+            print(
+                f'Your NAI scenario "{json_data["title"]}" was successfully '
+                "re-formatted."
+            )
+            print("-------------------------------------")
     return model
 
+
 def makenai(
-        source_file: str='scenario.json',
-        target: str='',
-        single_files: bool=True
-    ):
+    source_file: str = "scenario.json", target: str = "", single_files: bool = True
+):
     data = _json_to_scenario(source_file)
 
     if target:
@@ -151,65 +155,74 @@ def makenai(
     else:
         data.dump()
 
-def _json_to_scenario(source_file: Union[str, Path]) -> 'NAIScenario':
+
+def _json_to_scenario(source_file: Union[str, Path]) -> "NAIScenario":
     model = NAIScenario()
 
     data_scheme = model.data.copy()
-    an_scheme = data_scheme['context'].pop()
-    memory_scheme = data_scheme['context'].pop()
-    wi_entries_scheme = data_scheme['lorebook']['entries'].pop()
+    an_scheme = data_scheme["context"].pop()
+    memory_scheme = data_scheme["context"].pop()
+    wi_entries_scheme = data_scheme["lorebook"]["entries"].pop()
 
     with open(source_file) as file:
         json_data = json.load(file)
-    
+
     for scenario in json_data:
         data_scheme.update(scenario)
-        if 'worldInfo' in scenario and scenario['worldInfo']:
+        if "worldInfo" in scenario and scenario["worldInfo"]:
             entries = []
-            for wi in scenario['worldInfo']:
-                wi_entries_scheme.update({'text': wi['entry'], 'keys': wi['keys']})
+            for wi in scenario["worldInfo"]:
+                wi_entries_scheme.update({"text": wi["entry"], "keys": wi["keys"]})
                 entries.append(wi_entries_scheme.copy())
 
-        an_scheme.update({'text': scenario['authorsNote']})
-        memory_scheme.update({'text': scenario['memory']})
+        an_scheme.update({"text": scenario["authorsNote"]})
+        memory_scheme.update({"text": scenario["memory"]})
 
-        data_scheme.update({
-            'context':[memory_scheme.copy(), an_scheme.copy()],
-            'lorebook': {'entries': entries.copy()}
-        })
+        data_scheme.update(
+            {
+                "context": [memory_scheme.copy(), an_scheme.copy()],
+                "lorebook": {"entries": entries.copy()},
+            }
+        )
         model.add(data_scheme.copy())
         if DEBUG is False:
-            print('-------------------------------------')
-            print(f'Your AID scenario \"{scenario["title"]}\" was successfully ' \
-                    're-formatted.')
-            print('-------------------------------------')
+            print("-------------------------------------")
+            print(
+                f'Your AID scenario "{scenario["title"]}" was successfully '
+                "re-formatted."
+            )
+            print("-------------------------------------")
 
     return model
 
+
 def test():
     if pytest:
-        os.system(f'pytest {str(BASE_DIR)}/app/tests.py')
+        os.system(f"pytest {str(BASE_DIR)}/app/tests.py")
     else:
-        os.system(f'python -m unittest -v aids.app.tests')
+        os.system(f"python -m unittest -v aids.app.tests")
+
 
 def help():
-    with open(BASE_DIR / 'help.txt') as file:
+    with open(BASE_DIR / "help.txt") as file:
         print(file.read())
 
+
 def register():
-    with open(BASE_DIR / 'app/secrets.json', 'w') as file:
-        secrets_form.update({
-            "AID_USERNAME": (user := input("AID username: ")),
-            "AID_PASSWORD": getpass("AID password: ")
-        })
+    with open(BASE_DIR / "app/secrets.json", "w") as file:
+        secrets_form.update(
+            {
+                "AID_USERNAME": (user := input("AID username: ")),
+                "AID_PASSWORD": getpass("AID password: "),
+            }
+        )
         json.dump(secrets_form, file)
         print(f"User {user} successfully registered.")
 
+
 def alltohtml(
-        file_dir: Union[str, Path]='',
-        story_outfile: str='',
-        scenario_outfile: str=''
-    ):
+    file_dir: Union[str, Path] = "", story_outfile: str = "", scenario_outfile: str = ""
+):
     th = to_html.toHtml()
     if file_dir:
         th.out_path = file_dir
@@ -220,8 +233,8 @@ def alltohtml(
     try:
         th.story_to_html()
     except FileNotFoundError:
-        print('The were no stories to transform into .html')
+        print("The were no stories to transform into .html")
     try:
         th.scenario_to_html()
     except FileNotFoundError:
-        print('The were no scenarios to transform into .html')
+        print("The were no scenarios to transform into .html")
