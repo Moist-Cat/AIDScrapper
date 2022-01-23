@@ -197,7 +197,6 @@ class TestLogin(unittest.TestCase):
     def setUp(self):
 
         self.client = AIDScrapper()
-        self.client.session.get = unittest.mock.Mock
         self.client.session.post = unittest.mock.Mock
 
         self.client.session.post.json = lambda cls: {"data": {"login": {"accessToken": "dummyToken"}}}
@@ -216,7 +215,7 @@ class TestLogin(unittest.TestCase):
         self.client.session.headers["x-access-token"] == "dummyToken"
 
     def test_console_login(self):
-        aids.app.client.__builtins__["input"] = lambda string: "dummy"
+        aids.app.client.input = lambda string: "dummy"
         aids.app.client.getpass.getpass = lambda string: "dummypass"
 
         aids.app.client.settings.get_secret = lambda string: exec("raise ImproperlyConfigured")
@@ -228,16 +227,112 @@ class TestLogin(unittest.TestCase):
     def test_direct_login(self):
         self.client.login({"username": "dummy", "password": "dummypass"})
 
+class dummy_obj:
+    def __init__(self, id_maj=1, id_min=1):
+        self.id = f"{id_maj}.{id_min}"
+
+    def __getitem__(self, key):
+        if key == "title":
+            return "uninportant"
+        elif key == "publicId":
+            return self.id
+        else:
+            raise AssertionError(f"Unexpected key: {key}")
+
+        
+class dummy_nested_scen(dummy_obj):
+
+    def __init__(self, id_maj=1, id_min=1, options=None, isOption=False):
+        # Liskov be damned
+
+        self.isOption = False
+        self.options = options
+
+        super().__init__(id_maj, id_min)
+
+    def __contains__(self, value):
+        return value == "options"
+
+    def __getitem__(self, key):
+        if key == "isOption":
+            return self.isOption
+        elif key == "options":
+            return self.options
+        super().__getitem__(key)
+
+    def __setitem__(self, key, value):
+        if key == "isOption":
+            self.isOption = value
+        else:
+            raise AssertionError(f"Unexpected assignment: {key} -> {value}")
+
 class ClientGetStories(unittest.TestCase):
     def setUp(self):
 
         self.client = AIDScrapper()
-        self.client.session.get = unittest.mock.Mock
-        self.client.session.post = unittest.mock.Mock
+        # shut up
+        self.client.logger = unittest.mock.Mock()
+
+        self.client.session.post = unittest.mock.Mock()
+        
+        self.client.adventures = unittest.mock.Mock()
+        self.client.adventures.title = ""
+        self.client.adventures.__len__ = lambda cls: 0
+
+        self.client.prompts = unittest.mock.Mock()
+        # so it passes len()
+        self.client.prompts.__len__ = lambda cls: 0
 
 
+        obj_gen = ((dummy_obj(major, minor) for minor in range(3)) for major in range(3))
+        self.client._query_objects = lambda query: self.generate_or_empty(obj_gen)
+        self.client._get_story_content = unittest.mock.Mock()
+        self.client._get_scenario_content = unittest.mock.Mock()
+
+    @staticmethod
+    def generate_or_empty(gen):
+        try:
+            return next(gen)
+        except StopIteration:
+            return {}
 
 
+    def test_basic_get_stories(self):
+        self.client.get_stories()
+        self.assertEqual(self.client.adventures._add.call_count, 9)
+
+
+    @skip # Can't change adventure.title after setUp
+    def test_get_stories_no_title(self):
+        self.client.get_stories()
+        self.client.adventures.title = "dummytitle"
+        self.assertEqual(self.client.adventures.add.call_count, 9)
+
+    def test_basic_get_scenarios(self):
+        self.client.add_all_scenarios = unittest.mock.Mock()
+        self.client.get_scenarios()
+
+        self.assertEqual(self.client.add_all_scenarios.call_count, 9)
+
+    def test_add_all_scenarios(self):
+        isOption = True
+
+        obj = (dummy_nested_scen(
+           major,
+           options=[dummy_nested_scen(major, minor) for minor in range(3) if major == 0]
+           ) for major in range(4)
+        )
+
+#        self.client._get_scenario_content = lambda id: self.generate_or_empty(obj)
+        self.client._get_scenario_content = unittest.mock.Mock(
+                side_effect=lambda query: self.generate_or_empty(obj)
+        )
+
+        self.client.add_all_scenarios("doesn't matter")
+
+        self.assertEqual(self.client.offset, 1) # options are not added to offset
+
+        self.assertEqual(self.client._get_scenario_content.call_count, 4)
 
 class TestHtmlFiles(unittest.TestCase):
 

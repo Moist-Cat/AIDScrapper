@@ -27,8 +27,8 @@ def merge(any_dict: dict, other: dict) -> Dict[str, Any]:
 
 
 DEFAULT: Dict = {
-    "title": None,
-    "description": None,
+    "title": "",
+    "description": "",
     "tags": [],
     "createdAt": datetime.datetime.strftime(datetime.datetime.today(), "%Y/%m/%d"),
     "updatedAt": datetime.datetime.strftime(datetime.datetime.today(), "%Y/%m/%d"),

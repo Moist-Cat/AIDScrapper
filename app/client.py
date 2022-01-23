@@ -180,7 +180,8 @@ class AIDScrapper(BaseClient):
 
     def _get_story_content(self, story_id: str) -> Dict[str, Any]:
         self.story_query.update({"variables": {"publicId": story_id}})
-        return self.session.post(self.url, json=self.story_query).json()["data"]["adventure"]
+        adventure =  self.session.post(self.url, json=self.story_query).json()["data"]["adventure"]
+        return adventure
     
     def _get_scenario_content(self, scenario_id: str) -> Dict[str, Any]:
         self.scenario_query.update({"variables": {"publicId": scenario_id}})
@@ -193,47 +194,49 @@ class AIDScrapper(BaseClient):
         self.wi_query["variables"].update({"contentPublicId": scenario_id})
         return self.session.post(self.url, json=self.wi_query).json()["data"]["worldInfoType"]
 
-    def _get_object(self, query: dict) -> Dict[str, Any]:
-        query['variables']['input']['searchTerm'] = self.adventures.title or self.prompts.title
+    def _query_objects(self, query: dict, term: str="") -> Dict[str, Any]:
+        query["variables"]["input"]["searchTerm"] = term or self.adventures.title or self.prompts.title
 
         return self.session.post(
             self.url,
             data=json.dumps(
                 query
             )
-        ).json()['data']
+        ).json()["data"]["user"]["search"]
 
-    def get_stories(self) -> List[Dict[str, Any]]:
+    def get_stories(self):
         while True:
-            result = self._get_object(self.stories_query)['user']['search']
+            result: List[Dict[str, Any]] = self._query_objects(self.stories_query)
 
-            if any(result):
+            if result != {}:
+                assert result, "No result?"
+
                 for story in result:
                     s = self._get_story_content(story["publicId"])
                     self.offset += 1
                     if not self.adventures.title:
-                        # To optimize queries -- stop when we are under n actions
+                        # To optimize queries -- stop when we are under self.adventures.min_act actions
                         try:
                             self.adventures._add(s)
                         except ValidationError as exc:
                             self.logger.debug(exc)
                             # actions are under the limit. Abort.
-                            return
-                        
+                            break
                     else:
                         self.adventures.add(s)
                     self.logger.info("Loaded story: \"%s\"", story["title"])
-                self.logger.debug('Got %d stories so far', len(self.adventures))
+                self.logger.debug("Got %d stories so far", len(self.adventures))
                 self.stories_query['variables']['input']['offset'] = self.offset
             else:
                 self.logger.info('All stories downloaded')
                 break
 
-    def get_scenarios(self) -> List[Dict[str, Any]]:
+    def get_scenarios(self):
         while True:
-            result: List[Dict[str, Any]] = self._get_object(self.scenarios_query)['user']['search']
+            result: List[Dict[str, Any]] = self._query_objects(self.scenarios_query)
 
-            if any(result):
+            if result != {}:
+                assert result, "No result?"
                 for scenario in result:
                     self.add_all_scenarios(scenario["publicId"])
                 self.logger.debug('Got %d scenarios so far', len(self.prompts))
@@ -255,10 +258,10 @@ class AIDScrapper(BaseClient):
             for option in scenario["options"]:
                 self.add_all_scenarios(
                     option["publicId"], True
-                )        
+                )
         self.prompts.add(scenario)
         self.offset += 1 if not isOption else 0
-        self.logger.info("Added %s to memory", scenario['title'])
+        self.logger.info("Added %s to memory", scenario["title"])
 
     def get_login_token(self, credentials: Dict[str, Any]):
         self.aid_loginpayload['variables']['identifier'] = \

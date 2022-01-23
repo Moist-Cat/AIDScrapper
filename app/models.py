@@ -193,6 +193,7 @@ class BaseScenario(AIDSObject):
     """
     Base Scenario object.
     """
+    title: str = ""
 
     def __init__(self, title: str = ""):
         super().__init__()
@@ -220,6 +221,9 @@ class BaseStory(AIDSObject):
     # The action_field attribute is 
     # a string that is meant to be passed to eval to get the action
     # objects from the data.
+    title: str = settings.DEFAULT_TITLE
+    actions: int = settings.DEFAULT_MIN_ACT
+
     action_field: str = '[\"actions\"]'
 
     def __init__(self, title: str = "", actions: int = 0):

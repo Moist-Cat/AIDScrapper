@@ -58,11 +58,10 @@ class Aid(AIDScrapper):
     def fenix(self):
         try:
             self.prompts.load()
-            self.upload_in_bulk(self.prompts)
         except FileNotFoundError:
             self.get_scenarios()
             self.prompts.dump()
-            self.upload_in_bulk(self.prompts)
+        self.upload_in_bulk(self.prompts)
 
 class Holo(HoloClient):
     pass
