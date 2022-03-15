@@ -202,7 +202,7 @@ class TestLogin(unittest.TestCase):
 
         self.client.login()
 
-        self.client.session.headers["x-access-token"] == "dummyToken"
+        self.assertEqual(self.client.session.headers["x-access-token"], "dummyToken")
 
     def test_console_login(self):
         aids.app.client.input = lambda string: "dummy"
@@ -214,11 +214,12 @@ class TestLogin(unittest.TestCase):
 
         self.client.login()
 
-        self.client.session.headers["x-access-token"] == "dummyToken"
+        self.assertEqual(self.client.session.headers["x-access-token"], "dummyToken")
 
     def test_direct_login(self):
         self.client.login({"username": "dummy", "password": "dummypass"})
 
+        self.assertEqual(self.client.session.headers["x-access-token"], "dummyToken")
 
 class dummy_obj:
     def __init__(self, id_maj=1, id_min=1):
@@ -294,10 +295,9 @@ class ClientGetStories(unittest.TestCase):
         self.client.get_stories()
         self.assertEqual(self.client.adventures._add.call_count, 9)
 
-    @skip  # Can't change adventure.title after setUp
     def test_get_stories_no_title(self):
-        self.client.get_stories()
         self.client.adventures.title = "dummytitle"
+        self.client.get_stories()
         self.assertEqual(self.client.adventures.add.call_count, 9)
 
     def test_basic_get_scenarios(self):
