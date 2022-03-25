@@ -223,7 +223,7 @@ class AIDScrapper(BaseClient):
         while True:
             result: List[Dict[str, Any]] = self._query_objects(self.stories_query)
 
-            if result != {}:
+            if any(result):
                 assert result, "No result?"
 
                 for story in result:
@@ -236,7 +236,7 @@ class AIDScrapper(BaseClient):
                         except ValidationError as exc:
                             self.logger.debug(exc)
                             # actions are under the limit. Abort.
-                            break
+                            return
                     else:
                         self.adventures.add(s)
                     self.logger.info('Loaded story: "%s"', story["title"])
@@ -244,13 +244,13 @@ class AIDScrapper(BaseClient):
                 self.stories_query["variables"]["input"]["offset"] = self.offset
             else:
                 self.logger.info("All stories downloaded")
-                break
+                return
 
     def get_scenarios(self):
         while True:
             result: List[Dict[str, Any]] = self._query_objects(self.scenarios_query)
 
-            if result != {}:
+            if any(result):
                 assert result, "No result?"
                 for scenario in result:
                     self.add_all_scenarios(scenario["publicId"])
